@@ -42,9 +42,9 @@ class Program
         table.AddColumn("Description");
 
         table.AddRow("[cyan]list[/]", "List all available profiles");
-        table.AddRow("[cyan]use <profile> [args...][/]", "Switch to a specific profile and run gh copilot");
-        table.AddRow("[cyan]last [args...][/]", "Use the last used profile and run gh copilot");
-        table.AddRow("[cyan]default [args...][/]", "Use the default Copilot profile");
+        table.AddRow("[cyan]use <profile> [[args...]][/]", "Switch to a specific profile and run gh copilot");
+        table.AddRow("[cyan]last [[args...]][/]", "Use the last used profile and run gh copilot");
+        table.AddRow("[cyan]default [[args...]][/]", "Use the default Copilot profile");
         table.AddRow("[cyan]add[/]", "Add or update a profile interactively");
         table.AddRow("[cyan]help[/]", "Show this help message");
 
