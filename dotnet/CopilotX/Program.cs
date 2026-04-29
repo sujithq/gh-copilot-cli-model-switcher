@@ -7,6 +7,8 @@ namespace CopilotX;
 
 class Program
 {
+    static readonly string[] DefaultMcpCompatServers = ["foundry-mcp", "context7", "msx-mcp", "azure", "workiq", "powerbi-remote"];
+
     static string GetAzureCliCommand()
     {
         return OperatingSystem.IsWindows() ? "az.cmd" : "az";
@@ -92,6 +94,13 @@ class Program
         ifTable.AddRow("[cyan]--mode each|all[/]", "Prompt per deployment (each) or add all without prompts (all)");
         ifTable.AddRow("[cyan]--all[/]", "Shorthand for --mode all");
         AnsiConsole.Write(ifTable);
+
+        AnsiConsole.MarkupLine("\n[bold]Azure BYOK MCP compat mode[/]");
+        AnsiConsole.MarkupLine("  On first interactive launch of an Azure BYOK profile, you are prompted to select which MCP servers to");
+        AnsiConsole.MarkupLine("  disable (to avoid provider tool-count limits). The selection is saved as [cyan]mcpCompatServers[/] on the");
+        AnsiConsole.MarkupLine("  profile and reused on every subsequent run. Remove the field from config to re-prompt.");
+        AnsiConsole.MarkupLine("  Default candidates: [dim]foundry-mcp, context7, msx-mcp, azure, workiq, powerbi-remote[/]");
+        AnsiConsole.MarkupLine("  Set [cyan]COPILOTX_DISABLE_MCP_COMPAT=off[/] to skip compat mode entirely.");
 
         AnsiConsole.MarkupLine("\n[dim]Examples:[/]");
         AnsiConsole.MarkupLine("  copilotx list");
@@ -234,6 +243,24 @@ class Program
         ConfigManager.SetLastUsed(profileName);
 
         var userRequestedInteractive = copilotArgs.Length == 0;
+
+        // For Azure BYOK profiles in interactive mode, prompt for MCP servers to disable on first use.
+        var needsCompat = !(Environment.GetEnvironmentVariable("COPILOTX_DISABLE_MCP_COMPAT") ?? string.Empty)
+            .Trim().Equals("off", StringComparison.OrdinalIgnoreCase)
+            && (profile.Type == "byok" || profile.Type == "proxy")
+            && IsAzureProfile(profile);
+        var hasManualMcpControls = copilotArgs.Any(a =>
+            a.Equals("--disable-mcp-server", StringComparison.OrdinalIgnoreCase)
+            || a.Equals("--disable-builtin-mcps", StringComparison.OrdinalIgnoreCase)
+            || a.Equals("--available-tools", StringComparison.OrdinalIgnoreCase));
+
+        if (needsCompat && !hasManualMcpControls && userRequestedInteractive
+            && profile.McpCompatServers == null && !Console.IsInputRedirected)
+        {
+            profile.McpCompatServers = PromptMcpCompatServers(null);
+            ConfigManager.AddProfile(profile);
+        }
+
         var effectiveCopilotArgs = BuildCopilotArgs(profile, copilotArgs);
 
         try
@@ -294,23 +321,37 @@ class Program
 
             if (!hasManualMcpControls)
             {
-                var prefix = new List<string>
-                {
-                    "--disable-builtin-mcps",
-                    "--disable-mcp-server", "foundry-mcp",
-                    "--disable-mcp-server", "context7",
-                    "--disable-mcp-server", "msx-mcp",
-                    "--disable-mcp-server", "azure",
-                    "--disable-mcp-server", "workiq",
-                    "--disable-mcp-server", "powerbi-remote"
-                };
-
+                var serversToDisable = profile.McpCompatServers ?? new List<string>(DefaultMcpCompatServers);
+                var mcpArgs = serversToDisable.SelectMany(s => new[] { "--disable-mcp-server", s }).ToList();
+                var prefix = new List<string> { "--disable-builtin-mcps" };
+                prefix.AddRange(mcpArgs);
                 AnsiConsole.MarkupLine("[dim]Applying Azure BYOK MCP compatibility mode to avoid provider tool-limit errors.[/]");
                 return prefix.Concat(args).ToArray();
             }
         }
 
         return args.ToArray();
+    }
+
+    static List<string> PromptMcpCompatServers(List<string>? previousSelection)
+    {
+        var previous = previousSelection ?? new List<string>(DefaultMcpCompatServers);
+
+        var prompt = new MultiSelectionPrompt<string>()
+            .Title("Select MCP servers to [bold]disable[/] for Azure BYOK compat mode:")
+            .NotRequired()
+            .InstructionsText("[grey](Press [blue]<space>[/] to toggle, [green]<enter>[/] to confirm)[/]");
+
+        foreach (var server in DefaultMcpCompatServers)
+        {
+            var choice = prompt.AddChoice(server);
+            if (previous.Contains(server, StringComparer.OrdinalIgnoreCase))
+            {
+                choice.Select();
+            }
+        }
+
+        return AnsiConsole.Prompt(prompt);
     }
 
     static bool IsAzureProfile(Profile profile)

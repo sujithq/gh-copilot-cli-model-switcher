@@ -283,7 +283,13 @@ az account get-access-token --scope https://cognitiveservices.azure.com/.default
 
 The returned token is set as `COPILOT_PROVIDER_BEARER_TOKEN`. `COPILOT_PROVIDER_API_KEY` is cleared in token mode to avoid auth-mode ambiguity.
 
-For Azure BYOK profiles, CopilotX also enables an MCP compatibility mode by default to avoid provider tool-count limits (for example: `Invalid 'tools': array too long`). Set `COPILOTX_DISABLE_MCP_COMPAT=off` to opt out.
+For Azure BYOK profiles, CopilotX also enables an MCP compatibility mode by default to avoid provider tool-count limits (for example: `Invalid 'tools': array too long`).
+
+**Selecting which MCP servers to disable:** The first time you launch an Azure BYOK profile interactively (no `-p`), you are prompted to choose which MCP servers to disable from the known-heavy list. Your selection is saved to the profile under `mcpCompatServers` and reused on every subsequent run — no re-prompting needed.
+
+Default list of candidate servers: `foundry-mcp`, `context7`, `msx-mcp`, `azure`, `workiq`, `powerbi-remote`.
+
+To change the selection later, edit `mcpCompatServers` in your config file, or remove the field so the prompt appears again next time. To disable the entire compat mode, set `COPILOTX_DISABLE_MCP_COMPAT=off`.
 
 **Non-interactive mode & tool permissions:**
 

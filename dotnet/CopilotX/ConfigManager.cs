@@ -32,6 +32,9 @@ public class Profile
 
     [JsonPropertyName("tokenScope")]
     public string? TokenScope { get; set; }
+
+    [JsonPropertyName("mcpCompatServers")]
+    public List<string>? McpCompatServers { get; set; }
 }
 
 public class Config
