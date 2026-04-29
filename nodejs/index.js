@@ -153,8 +153,38 @@ async function setEnvironmentForProfile(profile) {
   return { usedAzureCliToken: false };
 }
 
+const DEFAULT_MCP_COMPAT_SERVERS = ['foundry-mcp', 'context7', 'msx-mcp', 'azure', 'workiq', 'powerbi-remote'];
+
 function isTokenFailure(text) {
   return /(401|unauthorized|forbidden|invalid token|token expired|expired token|authentication failed|permission denied)/i.test(text || '');
+}
+
+async function promptMcpCompatServers(previousSelection) {
+  const servers = DEFAULT_MCP_COMPAT_SERVERS;
+  const prev = previousSelection ?? servers;
+  const prevLabel = prev.length === servers.length
+    ? 'all'
+    : prev.length === 0
+      ? 'none'
+      : prev.join(', ');
+
+  console.log('\nSelect MCP servers to disable for Azure BYOK compat mode.');
+  console.log('Known servers:');
+  servers.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
+  console.log(`\nEnter numbers to disable (space/comma-separated), 'all', or 'none'.`);
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await new Promise((resolve) => {
+    rl.question(`Selection [${prevLabel}]: `, (ans) => { rl.close(); resolve((ans || '').trim()); });
+  });
+
+  if (!answer) return prev;
+  if (answer.toLowerCase() === 'all') return [...servers];
+  if (answer.toLowerCase() === 'none') return [];
+
+  const nums = answer.split(/[\s,]+/).map((n) => parseInt(n, 10)).filter((n) => !isNaN(n) && n >= 1 && n <= servers.length);
+  if (nums.length === 0) return prev;
+  return nums.map((n) => servers[n - 1]);
 }
 
 function buildCopilotArgs(profile, copilotArgs = []) {
@@ -180,15 +210,12 @@ function buildCopilotArgs(profile, copilotArgs = []) {
     );
 
     if (!hasManualMcpControls) {
+      const serversToDisable = profile.mcpCompatServers ?? DEFAULT_MCP_COMPAT_SERVERS;
+      const mcpArgs = serversToDisable.flatMap((s) => ['--disable-mcp-server', s]);
       console.log('Applying Azure BYOK MCP compatibility mode to avoid provider tool-limit errors.');
       return [
         '--disable-builtin-mcps',
-        '--disable-mcp-server', 'foundry-mcp',
-        '--disable-mcp-server', 'context7',
-        '--disable-mcp-server', 'msx-mcp',
-        '--disable-mcp-server', 'azure',
-        '--disable-mcp-server', 'workiq',
-        '--disable-mcp-server', 'powerbi-remote',
+        ...mcpArgs,
         ...args
       ];
     }
@@ -453,6 +480,19 @@ async function executeWithProfile(profileName, copilotArgs = []) {
   setLastUsed(profileName);
 
   const userRequestedInteractive = copilotArgs.length === 0;
+
+  // For Azure BYOK profiles in interactive mode, prompt for MCP servers to disable on first use.
+  const needsCompat = !((process.env.COPILOTX_DISABLE_MCP_COMPAT || '').trim().toLowerCase() === 'off')
+    && (profile.type === 'byok' || profile.type === 'proxy') && isAzureProfile(profile);
+  const hasManualMcpControls = copilotArgs.some((a) =>
+    a === '--disable-mcp-server' || a === '--disable-builtin-mcps' || a === '--available-tools'
+  );
+
+  if (needsCompat && !hasManualMcpControls && userRequestedInteractive && profile.mcpCompatServers === undefined) {
+    profile.mcpCompatServers = await promptMcpCompatServers(undefined);
+    addProfile(profile);
+  }
+
   const effectiveCopilotArgs = buildCopilotArgs(profile, copilotArgs);
 
   // If no args provided, show a hint that we're entering interactive mode
