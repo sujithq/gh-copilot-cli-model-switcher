@@ -38,6 +38,8 @@ copilotx manage
 Single interactive flow to:
 - `Use` a selected profile
 - `Remove` multiple profiles
+- `Add` a new profile
+- `Import` profiles from Foundry
 - `Exit`
 
 ### Use a specific profile

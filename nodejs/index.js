@@ -663,6 +663,94 @@ async function executeWithProfile(profileName, copilotArgs = []) {
   }
 }
 
+async function runAddProfileWizard() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  const question = (prompt) => {
+    return new Promise((resolve) => {
+      rl.question(prompt, resolve);
+    });
+  };
+
+  try {
+    const name = await question('Profile name: ');
+    if (!name.trim()) {
+      console.error('Profile name cannot be empty');
+      return 1;
+    }
+
+    const type = await question('Profile type (copilot/byok/proxy) [copilot]: ') || 'copilot';
+
+    const profile = { name: name.trim(), type: type.trim() };
+
+    if (type === 'byok' || type === 'proxy') {
+      const baseUrl = await question('Base URL: ');
+      if (baseUrl.trim()) {
+        profile.baseUrl = baseUrl.trim();
+      }
+
+      const model = await question('Model: ');
+      if (model.trim()) {
+        profile.model = model.trim();
+      }
+
+      const apiKeyChoice = await question('API Key source (env/direct/none) [env]: ') || 'env';
+
+      if (apiKeyChoice === 'env') {
+        const apiKeyEnv = await question('Environment variable name: ');
+        if (apiKeyEnv.trim()) {
+          profile.apiKeyEnv = apiKeyEnv.trim();
+        }
+      } else if (apiKeyChoice === 'direct') {
+        const apiKey = await question('API Key: ');
+        if (apiKey.trim()) {
+          profile.apiKey = apiKey.trim();
+        }
+      }
+
+      const providerType = await question('Provider type (optional): ');
+      if (providerType.trim()) {
+        profile.providerType = providerType.trim();
+      }
+
+      const azureCliToken = await question('Azure CLI token mode (auto/on/off) [auto]: ') || 'auto';
+      if (azureCliToken.trim()) {
+        profile.azureCliToken = azureCliToken.trim().toLowerCase();
+      }
+
+      if (profile.azureCliToken === 'auto' || profile.azureCliToken === 'on') {
+        const tokenScope = await question('Azure token scope [https://cognitiveservices.azure.com/.default]: ');
+        if (tokenScope.trim()) {
+          profile.tokenScope = tokenScope.trim();
+        }
+      }
+    }
+
+    const result = upsertProfile(profile);
+    if (result.ok) {
+      if (result.action === 'added') {
+        console.log(`Profile "${result.name}" added successfully!`);
+      } else if (result.action === 'updated-equivalent') {
+        console.log(`Equivalent profile already existed; updated "${result.name}" instead of creating a duplicate.`);
+      } else {
+        console.log(`Profile "${result.name}" updated successfully!`);
+      }
+      return 0;
+    }
+
+    console.error('Failed to add profile');
+    return 1;
+  } catch (error) {
+    console.error('Error adding profile:', error.message);
+    return 1;
+  } finally {
+    rl.close();
+  }
+}
+
 const argv = yargs(hideBin(process.argv))
   .scriptName('copilotx')
   .usage('$0 <command> [options]')
@@ -700,9 +788,9 @@ const argv = yargs(hideBin(process.argv))
   )
   .command(
     'manage',
-    'Interactive profile management (Use/Remove in one flow)',
+    'Interactive profile management (Use/Remove/Add/Import in one flow)',
     (yargs) => {
-      yargs.example('$0 manage', 'Choose Use or Remove from one interactive screen');
+      yargs.example('$0 manage', 'Choose Use, Remove, Add, or Import from one interactive screen');
     },
     async () => {
       const profiles = listProfiles();
@@ -722,7 +810,7 @@ const argv = yargs(hideBin(process.argv))
 
       const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
       const answer = await new Promise((resolve) => {
-        rl.question('\nAction: [u]se / [r]emove / [Enter] exit: ', (ans) => resolve((ans || '').trim().toLowerCase()));
+        rl.question('\nAction: [u]se / [r]emove / [a]dd / [i]mport / [Enter] exit: ', (ans) => resolve((ans || '').trim().toLowerCase()));
       });
 
       if (!answer) {
@@ -769,6 +857,20 @@ const argv = yargs(hideBin(process.argv))
 
         console.log(`Removed ${result.removed} profile(s).`);
         process.exit(0);
+        return;
+      }
+
+      if (answer === 'a' || answer === 'add') {
+        rl.close();
+        const code = await runAddProfileWizard();
+        process.exit(code);
+        return;
+      }
+
+      if (answer === 'i' || answer === 'import') {
+        rl.close();
+        const code = await importFoundryProfiles({});
+        process.exit(code);
         return;
       }
 
@@ -833,91 +935,8 @@ const argv = yargs(hideBin(process.argv))
       yargs.example('$0 add', 'Start the interactive wizard to add or update a profile');
     },
     async () => {
-      const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-      });
-
-      const question = (prompt) => {
-        return new Promise((resolve) => {
-          rl.question(prompt, resolve);
-        });
-      };
-
-      try {
-        const name = await question('Profile name: ');
-        if (!name.trim()) {
-          console.error('Profile name cannot be empty');
-          rl.close();
-          process.exit(1);
-        }
-
-        const type = await question('Profile type (copilot/byok/proxy) [copilot]: ') || 'copilot';
-
-        const profile = { name: name.trim(), type: type.trim() };
-
-        if (type === 'byok' || type === 'proxy') {
-          const baseUrl = await question('Base URL: ');
-          if (baseUrl.trim()) {
-            profile.baseUrl = baseUrl.trim();
-          }
-
-          const model = await question('Model: ');
-          if (model.trim()) {
-            profile.model = model.trim();
-          }
-
-          const apiKeyChoice = await question('API Key source (env/direct/none) [env]: ') || 'env';
-
-          if (apiKeyChoice === 'env') {
-            const apiKeyEnv = await question('Environment variable name: ');
-            if (apiKeyEnv.trim()) {
-              profile.apiKeyEnv = apiKeyEnv.trim();
-            }
-          } else if (apiKeyChoice === 'direct') {
-            const apiKey = await question('API Key: ');
-            if (apiKey.trim()) {
-              profile.apiKey = apiKey.trim();
-            }
-          }
-
-          const providerType = await question('Provider type (optional): ');
-          if (providerType.trim()) {
-            profile.providerType = providerType.trim();
-          }
-
-          const azureCliToken = await question('Azure CLI token mode (auto/on/off) [auto]: ') || 'auto';
-          if (azureCliToken.trim()) {
-            profile.azureCliToken = azureCliToken.trim().toLowerCase();
-          }
-
-          if (profile.azureCliToken === 'auto' || profile.azureCliToken === 'on') {
-            const tokenScope = await question('Azure token scope [https://cognitiveservices.azure.com/.default]: ');
-            if (tokenScope.trim()) {
-              profile.tokenScope = tokenScope.trim();
-            }
-          }
-        }
-
-        const result = upsertProfile(profile);
-        if (result.ok) {
-          if (result.action === 'added') {
-            console.log(`Profile "${result.name}" added successfully!`);
-          } else if (result.action === 'updated-equivalent') {
-            console.log(`Equivalent profile already existed; updated "${result.name}" instead of creating a duplicate.`);
-          } else {
-            console.log(`Profile "${result.name}" updated successfully!`);
-          }
-        } else {
-          console.error('Failed to add profile');
-          process.exit(1);
-        }
-      } catch (error) {
-        console.error('Error adding profile:', error.message);
-        process.exit(1);
-      } finally {
-        rl.close();
-      }
+      const code = await runAddProfileWizard();
+      process.exit(code);
     }
   )
   .command(
