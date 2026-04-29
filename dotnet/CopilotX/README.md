@@ -332,6 +332,7 @@ dotnet run --project ../CopilotX.Tests/CopilotX.Tests.csproj
 ```
 
 Unit tests use xUnit and execute via `dotnet run`.
+Current tests include config scope/path resolution, default config creation, profile upsert semantics, and last-used persistence using isolated temp config directories.
 
 ## Features
 

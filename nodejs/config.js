@@ -3,7 +3,11 @@ const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
 
-const CONFIG_DIR = path.join(os.homedir(), '.copilotx');
+const DEFAULT_CONFIG_DIR = path.join(os.homedir(), '.copilotx');
+
+function getConfigDir() {
+  return process.env.COPILOTX_CONFIG_DIR || DEFAULT_CONFIG_DIR;
+}
 
 function sanitizeSegment(value) {
   return (value || 'unknown')
@@ -41,20 +45,20 @@ function resolveConfigFile() {
   return resolveConfigFileFor(scope, getAzureIdentityKey());
 }
 
-function resolveConfigFileFor(scope, identityKey) {
+function resolveConfigFileFor(scope, identityKey, configDir = getConfigDir()) {
   const normalizedScope = (scope || 'auto').toLowerCase();
 
   if (normalizedScope === 'global') {
-    return path.join(CONFIG_DIR, 'config.json');
+    return path.join(configDir, 'config.json');
   }
 
   if (normalizedScope === 'azure-user' || normalizedScope === 'auto') {
     if (identityKey) {
-      return path.join(CONFIG_DIR, `config.${identityKey}.json`);
+      return path.join(configDir, `config.${identityKey}.json`);
     }
   }
 
-  return path.join(CONFIG_DIR, 'config.json');
+  return path.join(configDir, 'config.json');
 }
 
 const DEFAULT_CONFIG = {
@@ -69,8 +73,9 @@ const DEFAULT_CONFIG = {
 };
 
 function ensureConfigDir() {
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  const configDir = getConfigDir();
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
   }
 }
 
@@ -153,6 +158,7 @@ module.exports = {
   getConfigFile: resolveConfigFile,
   __test: {
     sanitizeSegment,
-    resolveConfigFileFor
+    resolveConfigFileFor,
+    getConfigDir
   }
 };
