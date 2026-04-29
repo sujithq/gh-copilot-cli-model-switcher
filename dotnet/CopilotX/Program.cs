@@ -59,22 +59,53 @@ class Program
         table.AddColumn("Command");
         table.AddColumn("Description");
 
-        table.AddRow("[cyan]list[/]", "List all available profiles");
+        table.AddRow("[cyan]list[/]", "List all available profiles (interactive selection)");
         table.AddRow("[cyan]use <profile> [[args...]][/]", "Switch to a specific profile and run gh copilot");
         table.AddRow("[cyan]last [[args...]][/]", "Use the last used profile and run gh copilot");
         table.AddRow("[cyan]default [[args...]][/]", "Use the default Copilot profile");
         table.AddRow("[cyan]add[/]", "Add or update a profile interactively");
-        table.AddRow("[cyan]import-foundry[/]", "Import profiles from Foundry/Azure OpenAI deployments");
+        table.AddRow("[cyan]import-foundry [[options]][/]", "Import profiles from Foundry/Azure OpenAI deployments");
         table.AddRow("[cyan]help[/]", "Show this help message");
 
         AnsiConsole.Write(table);
 
+        AnsiConsole.MarkupLine("\n[bold]Passthrough flags[/] [dim](forwarded to gh copilot, applies to use / last / default):[/]");
+        var flagTable = new Table();
+        flagTable.AddColumn("Flag");
+        flagTable.AddColumn("Description");
+        flagTable.AddRow("[cyan]-p / --prompt <text>[/]", "Run non-interactively with a prompt");
+        flagTable.AddRow("[cyan]--allow-all-tools[/]", "Allow all tools (auto-injected in -p mode)");
+        flagTable.AddRow("[cyan]--allow-all / --yolo[/]", "Allow all tools and operations");
+        flagTable.AddRow("[cyan]--allow-tool <name>[/]", "Allow only a specific named tool");
+        flagTable.AddRow("[cyan]--deny-tool <name>[/]", "Deny a specific named tool");
+        flagTable.AddRow("[cyan]--disable-mcp-server <name>[/]", "Disable a named MCP server");
+        flagTable.AddRow("[cyan]--disable-builtin-mcps[/]", "Disable all built-in MCP servers");
+        AnsiConsole.Write(flagTable);
+
+        AnsiConsole.MarkupLine("\n[bold]import-foundry options:[/]");
+        var ifTable = new Table();
+        ifTable.AddColumn("Option");
+        ifTable.AddColumn("Description");
+        ifTable.AddRow("[cyan]--account <name>[/]", "Limit import to a single named account");
+        ifTable.AddRow("[cyan]--resource-group <rg>[/]", "Resource group of the account (required with --account)");
+        ifTable.AddRow("[cyan]--subscription <id|name>[/]", "Scope discovery to a specific subscription");
+        ifTable.AddRow("[cyan]--mode each|all[/]", "Prompt per deployment (each) or add all without prompts (all)");
+        ifTable.AddRow("[cyan]--all[/]", "Shorthand for --mode all");
+        AnsiConsole.Write(ifTable);
+
         AnsiConsole.MarkupLine("\n[dim]Examples:[/]");
         AnsiConsole.MarkupLine("  copilotx list");
+        AnsiConsole.MarkupLine("  copilotx use azure-gpt");
         AnsiConsole.MarkupLine("  copilotx use azure-gpt suggest \"create a function\"");
-        AnsiConsole.MarkupLine("  copilotx last");
+        AnsiConsole.MarkupLine("  copilotx use azure-gpt -p \"fix the failing tests\"");
+        AnsiConsole.MarkupLine("  copilotx use azure-gpt -p \"refactor this\" --allow-tool=write");
+        AnsiConsole.MarkupLine("  copilotx last -p \"explain this code\"");
+        AnsiConsole.MarkupLine("  copilotx default");
         AnsiConsole.MarkupLine("  copilotx add");
-        AnsiConsole.MarkupLine("  copilotx import-foundry --mode each");
+        AnsiConsole.MarkupLine("  copilotx import-foundry");
+        AnsiConsole.MarkupLine("  copilotx import-foundry --all");
+        AnsiConsole.MarkupLine("  copilotx import-foundry --account myfoundry --resource-group my-rg --all");
+        AnsiConsole.MarkupLine("  copilotx import-foundry --subscription 00000000-0000-0000-0000-000000000000 --all");
 
         return 0;
     }

@@ -45,36 +45,84 @@ copilotx list
 
 Shows all configured profiles in a formatted table. The last used profile is marked with `*`.
 
+After displaying the table you are prompted to enter a profile number to launch it directly in interactive mode. Press Enter to exit without launching.
+
 ### Use a specific profile
 
 ```bash
-copilotx use <profile-name>
+copilotx use <profile> [copilot-args..]
 ```
 
-Switch to a profile and run GitHub Copilot CLI with that configuration.
+Switch to a profile and run GitHub Copilot CLI with that configuration. Without extra arguments, launches `gh copilot` in interactive mode.
 
-You can pass additional arguments to `gh copilot`:
+All arguments after the profile name are forwarded directly to `gh copilot`.
+
+**Examples:**
 
 ```bash
+# Interactive mode
+copilotx use azure-gpt
+
+# Sub-command passthrough
 copilotx use azure-gpt suggest "how to list files"
 copilotx use ollama-local explain "what is this code doing"
+
+# Non-interactive prompt (-p / --prompt)
+copilotx use azure-gpt -p "fix the failing tests"
+copilotx use azure-gpt -p "refactor this function" --allow-tool=write
+
+# Deny a specific tool
+copilotx use azure-gpt -p "explain this code" --deny-tool=run_command
+
+# Disable a named MCP server
+copilotx use azure-gpt -p "fix the tests" --disable-mcp-server=foundry-mcp
 ```
+
+**Common passthrough flags:**
+
+| Flag | Description |
+|---|---|
+| `-p` / `--prompt <text>` | Run non-interactively with a prompt |
+| `--allow-all-tools` | Allow all tools (auto-injected in `-p` mode) |
+| `--allow-all` / `--yolo` | Allow all tools and operations |
+| `--allow-tool <name>` | Allow only a specific named tool |
+| `--deny-tool <name>` | Deny a specific named tool |
+| `--disable-mcp-server <name>` | Disable a named MCP server |
+| `--disable-builtin-mcps` | Disable all built-in MCP servers |
 
 ### Use the last used profile
 
 ```bash
-copilotx last
+copilotx last [copilot-args..]
 ```
 
-Quick access to your most recently used profile.
+Quick access to your most recently used profile. Accepts the same passthrough flags as `use`.
+
+```bash
+# Interactive mode
+copilotx last
+
+# Non-interactive prompt
+copilotx last -p "explain this code"
+copilotx last suggest "how to list files"
+```
 
 ### Use default Copilot
 
 ```bash
-copilotx default
+copilotx default [copilot-args..]
 ```
 
-Switch back to the default GitHub Copilot (no BYOK).
+Switch back to the default GitHub Copilot (no BYOK). Accepts the same passthrough flags as `use`.
+
+```bash
+# Interactive mode
+copilotx default
+
+# Non-interactive prompt
+copilotx default -p "explain this code"
+copilotx default suggest "how do I list files?"
+```
 
 ### Add a new profile
 
@@ -90,7 +138,28 @@ Interactive wizard with Spectre.Console prompts to add or update a profile. Feat
 ### Import profiles from Foundry deployments
 
 ```bash
-# Scan all applicable accounts and prompt per deployment
+copilotx import-foundry [options]
+```
+
+Discovers Azure OpenAI / Foundry accounts and deployments via Azure CLI and creates CopilotX profiles.
+
+**Options:**
+
+| Option | Description |
+|---|---|
+| `--account <name>` | Limit import to a single named account |
+| `--resource-group <rg>` | Resource group of the account (required with `--account`) |
+| `--subscription <id\|name>` | Scope discovery to a specific subscription |
+| `--mode each\|all` | Prompt per deployment (`each`) or add all without prompts (`all`) |
+| `--all` | Shorthand for `--mode all` |
+
+**Examples:**
+
+```bash
+# Discover all accounts and prompt per deployment (interactive)
+copilotx import-foundry
+
+# Explicit mode each
 copilotx import-foundry --mode each
 
 # Add all deployments without prompt
@@ -98,6 +167,10 @@ copilotx import-foundry --all
 
 # Target one account/resource group
 copilotx import-foundry --account myfoundry --resource-group my-rg --all
+
+# Scope to a specific subscription
+copilotx import-foundry --subscription 00000000-0000-0000-0000-000000000000 --all
+```
 ```
 
 ## Configuration
@@ -212,6 +285,32 @@ The returned token is set as `COPILOT_PROVIDER_BEARER_TOKEN`. `COPILOT_PROVIDER_
 
 For Azure BYOK profiles, CopilotX also enables an MCP compatibility mode by default to avoid provider tool-count limits (for example: `Invalid 'tools': array too long`). Set `COPILOTX_DISABLE_MCP_COMPAT=off` to opt out.
 
+**Non-interactive mode & tool permissions:**
+
+When you pass `-p`/`--prompt` (non-interactive mode), `gh copilot` cannot prompt for per-tool permission at runtime and will fail with `could not request permission from user`. CopilotX automatically adds `--allow-all-tools` for you so scripts and piped usage work without extra flags.
+
+If you already specify any of the permission flags below, auto-injection is skipped:
+
+| Flag | Effect |
+|---|---|
+| `--allow-all-tools` | Allow all tools (default auto-injection) |
+| `--allow-all` | Allow all tools and operations |
+| `--yolo` | Alias for `--allow-all` |
+| `--allow-tool <name>` | Allow a specific tool only |
+
+Examples:
+
+```bash
+# Auto-injection: --allow-all-tools is added for you
+copilotx use myprofile -p "fix the tests"
+
+# Explicit override: only allow the write tool
+copilotx use myprofile -p "fix the tests" --allow-tool=write
+
+# Restrict further with --deny-tool even when --allow-all-tools is injected
+copilotx use myprofile -p "fix the tests" --deny-tool=run_command
+```
+
 Retry behavior:
 - If `gh copilot` fails with token/auth-related errors, CopilotX refreshes the token and retries once.
 
@@ -296,7 +395,13 @@ copilotx add
 # List all profiles with beautiful table
 copilotx list
 
-# Use Azure profile
+# Use Azure profile interactively
+copilotx use azure-gpt
+
+# Use Azure profile with a prompt (non-interactive)
+copilotx use azure-gpt -p "create a function to sort an array"
+
+# Use Azure profile with suggest sub-command
 copilotx use azure-gpt suggest "create a function to sort an array"
 
 # Switch back to default
@@ -304,6 +409,12 @@ copilotx default suggest "explain this code"
 
 # Use last profile
 copilotx last
+
+# Use last profile non-interactively
+copilotx last -p "fix the failing test"
+
+# Import all Foundry deployments
+copilotx import-foundry --all
 ```
 
 ## Development
