@@ -328,10 +328,10 @@ dotnet pack
 ### Test
 
 ```bash
-dotnet test ../CopilotX.Tests/CopilotX.Tests.csproj
+dotnet run --project ../CopilotX.Tests/CopilotX.Tests.csproj
 ```
 
-Unit tests use MSTest on Microsoft Testing Platform (`UseMicrosoftTestingPlatformRunner=true`).
+Unit tests use xUnit and execute via `dotnet run`.
 
 ## Features
 
