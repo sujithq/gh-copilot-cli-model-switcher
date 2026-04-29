@@ -25,6 +25,12 @@ public class Profile
 
     [JsonPropertyName("providerType")]
     public string? ProviderType { get; set; }
+
+    [JsonPropertyName("azureCliToken")]
+    public string? AzureCliToken { get; set; }
+
+    [JsonPropertyName("tokenScope")]
+    public string? TokenScope { get; set; }
 }
 
 public class Config

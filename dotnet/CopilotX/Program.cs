@@ -1,5 +1,6 @@
 using Spectre.Console;
 using System.Diagnostics;
+using System.Text;
 
 namespace CopilotX;
 
@@ -108,7 +109,7 @@ class Program
         var profileName = args[0];
         var copilotArgs = args.Skip(1).ToArray();
 
-        return ExecuteWithProfile(profileName, copilotArgs);
+        return ExecuteWithProfile(profileName, copilotArgs).GetAwaiter().GetResult();
     }
 
     static int LastCommand(string[] args)
@@ -121,15 +122,15 @@ class Program
             return 1;
         }
 
-        return ExecuteWithProfile(lastUsed, args);
+        return ExecuteWithProfile(lastUsed, args).GetAwaiter().GetResult();
     }
 
     static int DefaultCommand(string[] args)
     {
-        return ExecuteWithProfile("default", args);
+        return ExecuteWithProfile("default", args).GetAwaiter().GetResult();
     }
 
-    static int ExecuteWithProfile(string profileName, string[] copilotArgs)
+    static async Task<int> ExecuteWithProfile(string profileName, string[] copilotArgs)
     {
         var profile = ConfigManager.GetProfile(profileName);
 
@@ -142,32 +143,33 @@ class Program
 
         AnsiConsole.MarkupLine($"[green]Using profile:[/] {profile.Name} ([dim]{profile.Type}[/])");
 
-        SetEnvironmentForProfile(profile);
-        ConfigManager.SetLastUsed(profileName);
-
-        var startInfo = new ProcessStartInfo
+        AuthEnvironmentResult envInfo;
+        try
         {
-            FileName = "gh",
-            UseShellExecute = false
-        };
-
-        startInfo.ArgumentList.Add("copilot");
-        foreach (var arg in copilotArgs)
-        {
-            startInfo.ArgumentList.Add(arg);
+            envInfo = await SetEnvironmentForProfile(profile);
         }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Error setting auth environment: {ex.Message}[/]");
+            AnsiConsole.MarkupLine("[dim]For Azure CLI token auth, ensure az is installed and you are logged in: az login[/]");
+            return 1;
+        }
+
+        ConfigManager.SetLastUsed(profileName);
 
         try
         {
-            var process = Process.Start(startInfo);
-            if (process == null)
+            var result = await RunCopilot(copilotArgs);
+
+            if (result.ExitCode != 0 && envInfo.UsedAzureCliToken && IsTokenFailure(result.Output))
             {
-                AnsiConsole.MarkupLine("[red]Error: Failed to start gh copilot[/]");
-                return 1;
+                AnsiConsole.MarkupLine("[yellow]Detected token-related auth failure. Refreshing Azure CLI token and retrying once...[/]");
+                var refreshedToken = await GetAzureCliToken(profile);
+                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", refreshedToken);
+                result = await RunCopilot(copilotArgs);
             }
 
-            process.WaitForExit();
-            return process.ExitCode;
+            return result.ExitCode;
         }
         catch (Exception ex)
         {
@@ -177,7 +179,78 @@ class Program
         }
     }
 
-    static void SetEnvironmentForProfile(Profile profile)
+    static bool IsAzureProfile(Profile profile)
+    {
+        var baseUrl = profile.BaseUrl?.ToLowerInvariant() ?? string.Empty;
+        var providerType = profile.ProviderType?.ToLowerInvariant() ?? string.Empty;
+        return baseUrl.Contains(".openai.azure.com") || providerType == "azure";
+    }
+
+    static bool ShouldUseAzureCliToken(Profile profile, bool hasApiKey)
+    {
+        var mode = (profile.AzureCliToken ?? "auto").ToLowerInvariant();
+
+        if (mode == "on")
+        {
+            return true;
+        }
+
+        if (mode == "off")
+        {
+            return false;
+        }
+
+        return !hasApiKey && IsAzureProfile(profile);
+    }
+
+    static async Task<string> GetAzureCliToken(Profile profile)
+    {
+        var scope = string.IsNullOrWhiteSpace(profile.TokenScope)
+            ? "https://cognitiveservices.azure.com/.default"
+            : profile.TokenScope;
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "az",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        startInfo.ArgumentList.Add("account");
+        startInfo.ArgumentList.Add("get-access-token");
+        startInfo.ArgumentList.Add("--scope");
+        startInfo.ArgumentList.Add(scope);
+        startInfo.ArgumentList.Add("--query");
+        startInfo.ArgumentList.Add("accessToken");
+        startInfo.ArgumentList.Add("-o");
+        startInfo.ArgumentList.Add("tsv");
+
+        var process = Process.Start(startInfo);
+        if (process == null)
+        {
+            throw new InvalidOperationException("Failed to start az CLI process.");
+        }
+
+        var stdout = await process.StandardOutput.ReadToEndAsync();
+        var stderr = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"az account get-access-token failed (exit {process.ExitCode}): {stderr.Trim()}");
+        }
+
+        var token = stdout.Trim();
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            throw new InvalidOperationException("az CLI returned an empty access token.");
+        }
+
+        return token;
+    }
+
+    static async Task<AuthEnvironmentResult> SetEnvironmentForProfile(Profile profile)
     {
         if (profile.Type == "copilot")
         {
@@ -185,6 +258,7 @@ class Program
             Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
             Environment.SetEnvironmentVariable("COPILOT_MODEL", null);
             Environment.SetEnvironmentVariable("COPILOT_PROVIDER_TYPE", null);
+            return new AuthEnvironmentResult { UsedAzureCliToken = false };
         }
         else if (profile.Type == "byok" || profile.Type == "proxy")
         {
@@ -198,12 +272,14 @@ class Program
                 Environment.SetEnvironmentVariable("COPILOT_MODEL", profile.Model);
             }
 
+            string? resolvedApiKey = null;
+
             if (!string.IsNullOrEmpty(profile.ApiKeyEnv))
             {
                 var apiKey = Environment.GetEnvironmentVariable(profile.ApiKeyEnv);
                 if (!string.IsNullOrEmpty(apiKey))
                 {
-                    Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", apiKey);
+                    resolvedApiKey = apiKey;
                 }
                 else
                 {
@@ -212,14 +288,121 @@ class Program
             }
             else if (!string.IsNullOrEmpty(profile.ApiKey))
             {
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", profile.ApiKey);
+                resolvedApiKey = profile.ApiKey;
+            }
+
+            var useAzureCliToken = ShouldUseAzureCliToken(profile, !string.IsNullOrEmpty(resolvedApiKey));
+            if (useAzureCliToken)
+            {
+                var token = await GetAzureCliToken(profile);
+                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", token);
+            }
+            else if (!string.IsNullOrEmpty(resolvedApiKey))
+            {
+                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", resolvedApiKey);
+            }
+            else
+            {
+                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
             }
 
             if (!string.IsNullOrEmpty(profile.ProviderType))
             {
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_TYPE", profile.ProviderType);
             }
+
+            return new AuthEnvironmentResult { UsedAzureCliToken = useAzureCliToken };
         }
+
+        return new AuthEnvironmentResult { UsedAzureCliToken = false };
+    }
+
+    static bool IsTokenFailure(string output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return false;
+        }
+
+        var lower = output.ToLowerInvariant();
+        return lower.Contains("401")
+            || lower.Contains("unauthorized")
+            || lower.Contains("forbidden")
+            || lower.Contains("invalid token")
+            || lower.Contains("token expired")
+            || lower.Contains("expired token")
+            || lower.Contains("authentication failed")
+            || lower.Contains("permission denied");
+    }
+
+    static async Task<ProcessRunResult> RunCopilot(string[] copilotArgs)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "gh",
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        startInfo.ArgumentList.Add("copilot");
+        foreach (var arg in copilotArgs)
+        {
+            startInfo.ArgumentList.Add(arg);
+        }
+
+        var process = Process.Start(startInfo);
+        if (process == null)
+        {
+            throw new InvalidOperationException("Failed to start gh copilot.");
+        }
+
+        _ = Task.Run(async () =>
+        {
+            await Console.OpenStandardInput().CopyToAsync(process.StandardInput.BaseStream);
+            process.StandardInput.Close();
+        });
+
+        var outputBuilder = new StringBuilder();
+
+        var stdoutTask = Task.Run(async () =>
+        {
+            while (true)
+            {
+                var line = await process.StandardOutput.ReadLineAsync();
+                if (line == null)
+                {
+                    break;
+                }
+
+                outputBuilder.AppendLine(line);
+                Console.Out.WriteLine(line);
+            }
+        });
+
+        var stderrTask = Task.Run(async () =>
+        {
+            while (true)
+            {
+                var line = await process.StandardError.ReadLineAsync();
+                if (line == null)
+                {
+                    break;
+                }
+
+                outputBuilder.AppendLine(line);
+                Console.Error.WriteLine(line);
+            }
+        });
+
+        await Task.WhenAll(stdoutTask, stderrTask, process.WaitForExitAsync());
+
+        return new ProcessRunResult
+        {
+            ExitCode = process.ExitCode,
+            Output = outputBuilder.ToString()
+        };
     }
 
     static int AddCommand()
@@ -266,6 +449,16 @@ class Program
             }
 
             profile.ProviderType = AnsiConsole.Ask<string>("Provider [cyan]type[/] (optional):", string.Empty);
+
+            profile.AzureCliToken = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Azure CLI token [cyan]mode[/]:")
+                    .AddChoices(new[] { "auto", "on", "off" }));
+
+            if (profile.AzureCliToken == "auto" || profile.AzureCliToken == "on")
+            {
+                profile.TokenScope = AnsiConsole.Ask<string>("Azure token [cyan]scope[/] (optional):", string.Empty);
+            }
         }
 
         if (ConfigManager.AddProfile(profile))
@@ -279,5 +472,16 @@ class Program
         }
 
         return 0;
+    }
+
+    class AuthEnvironmentResult
+    {
+        public bool UsedAzureCliToken { get; set; }
+    }
+
+    class ProcessRunResult
+    {
+        public int ExitCode { get; set; }
+        public string Output { get; set; } = string.Empty;
     }
 }

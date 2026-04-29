@@ -96,9 +96,11 @@ interface Profile {
   type: 'copilot' | 'byok' | 'proxy'
   model?: string
   baseUrl?: string
-  apiKeyEnv?: string
-  apiKey?: string
-  providerType?: string
+    apiKeyEnv?: string
+    apiKey?: string
+    providerType?: string
+    azureCliToken?: 'auto' | 'on' | 'off'
+    tokenScope?: string
 }
 ```
 
@@ -121,13 +123,23 @@ ELSE IF profile.type == 'byok' OR 'proxy':
     SET COPILOT_PROVIDER_BASE_URL = profile.baseUrl
     SET COPILOT_MODEL = profile.model
 
-    IF profile.apiKeyEnv:
-        SET COPILOT_PROVIDER_API_KEY = ENV[profile.apiKeyEnv]
-    ELSE IF profile.apiKey:
-        SET COPILOT_PROVIDER_API_KEY = profile.apiKey
+    RESOLVE apiKey from apiKeyEnv/apiKey
+    DETERMINE azureCliToken mode (auto/on/off)
+
+    IF azureCliToken enabled:
+        RUN az account get-access-token
+        SET COPILOT_PROVIDER_API_KEY = <token>
+    ELSE IF apiKey is present:
+        SET COPILOT_PROVIDER_API_KEY = apiKey
 
     IF profile.providerType:
         SET COPILOT_PROVIDER_TYPE = profile.providerType
+
+EXECUTE gh copilot
+
+IF auth/token failure detected AND azureCliToken was used:
+    REFRESH token via az account get-access-token
+    RETRY gh copilot once
 ```
 
 ### 4. Copilot Launcher
@@ -215,6 +227,18 @@ CopilotX → GitHub Copilot CLI → Proxy → Azure OpenAI (RBAC)
 
 **Configuration**: Point to proxy endpoint with proxy key
 
+### Pattern 2b: RBAC Local Wrapper (No API Keys)
+
+```
+CopilotX → Azure CLI token → GitHub Copilot CLI → Azure OpenAI (RBAC)
+```
+
+**Use Case**: API keys disabled, local developer workflow
+**Configuration**:
+- `azureCliToken: auto` or `on`
+- `providerType: azure` (recommended)
+- `tokenScope: https://cognitiveservices.azure.com/.default` (default)
+
 ### Pattern 3: Local Models
 
 ```
@@ -253,6 +277,11 @@ For enterprise scenarios:
 - Use proxy with automatic token refresh
 - Don't store tokens directly in config
 - Proxy handles short-lived token lifecycle
+
+For local wrapper token mode:
+- Token is acquired on each run via Azure CLI
+- Token refresh + one-time retry is automatic on token/auth failures
+- Requires local `az login` session
 
 ## 🔌 Implementation Differences
 
@@ -309,7 +338,9 @@ For enterprise scenarios:
           "baseUrl": { "type": "string" },
           "apiKeyEnv": { "type": "string" },
           "apiKey": { "type": "string" },
-          "providerType": { "type": "string" }
+          "providerType": { "type": "string" },
+          "azureCliToken": { "type": "string", "enum": ["auto", "on", "off"] },
+          "tokenScope": { "type": "string" }
         },
         "required": ["name", "type"]
       }

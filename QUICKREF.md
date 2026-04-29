@@ -45,6 +45,19 @@ cd dotnet/CopilotX && dotnet pack && dotnet tool install --global --add-source .
 }
 ```
 
+### Azure OpenAI (API Keys Disabled)
+```json
+{
+  "name": "azure-rbac-local",
+  "type": "byok",
+  "baseUrl": "https://xxx.openai.azure.com/openai/deployments/gpt-4",
+  "model": "gpt-4",
+  "providerType": "azure",
+  "azureCliToken": "auto",
+  "tokenScope": "https://cognitiveservices.azure.com/.default"
+}
+```
+
 ### OpenAI
 ```json
 {
@@ -89,6 +102,16 @@ export OPENAI_API_KEY="sk-..."
 # API Management
 export APIM_KEY="your-key"
 ```
+
+For keyless Azure profiles, CopilotX uses Azure CLI:
+```bash
+az login
+az account get-access-token --scope https://cognitiveservices.azure.com/.default
+```
+
+Auth toggle fields:
+- `azureCliToken`: `auto` (default), `on`, `off`
+- `tokenScope`: Azure scope for token requests
 
 ## Common Workflows
 

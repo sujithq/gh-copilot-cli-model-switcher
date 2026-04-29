@@ -131,6 +131,8 @@ Fields:
 - `apiKeyEnv`: Environment variable containing the API key
 - `apiKey`: Direct API key (alternative to `apiKeyEnv`, less secure)
 - `providerType`: Optional provider type
+- `azureCliToken`: Optional token mode (`auto`, `on`, `off`)
+- `tokenScope`: Optional Azure token scope
 
 #### `proxy` (Proxy Configuration)
 
@@ -155,6 +157,17 @@ export COPILOT_PROVIDER_API_KEY=<key>
 export COPILOT_MODEL=<model>
 gh copilot
 ```
+
+If `azureCliToken` is enabled (or `auto` detects Azure profile with no API key), CopilotX runs:
+
+```bash
+az account get-access-token --scope https://cognitiveservices.azure.com/.default --query accessToken -o tsv
+```
+
+Then it uses the returned token as `COPILOT_PROVIDER_API_KEY`.
+
+Retry behavior:
+- If `gh copilot` fails with token/auth-related errors, CopilotX refreshes the token and retries once.
 
 ## Enterprise Scenarios
 
@@ -188,6 +201,24 @@ The proxy handles:
 - Token acquisition (Microsoft Entra ID)
 - Token refresh
 - RBAC authentication
+
+### Azure OpenAI with RBAC (API Keys Disabled, Local Wrapper)
+
+```json
+{
+  "name": "azure-rbac-local",
+  "type": "byok",
+  "baseUrl": "https://your-resource.openai.azure.com/openai/deployments/your-deployment",
+  "model": "gpt-4",
+  "providerType": "azure",
+  "azureCliToken": "auto",
+  "tokenScope": "https://cognitiveservices.azure.com/.default"
+}
+```
+
+Requirements:
+- Azure CLI installed
+- Logged in: `az login`
 
 ### Ollama Local
 

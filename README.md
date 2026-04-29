@@ -82,6 +82,8 @@ GitHub Copilot CLI can connect to external models via environment variables:
 - `COPILOT_MODEL`
 - `COPILOT_PROVIDER_TYPE`
 
+CopilotX can now source `COPILOT_PROVIDER_API_KEY` from Azure CLI access tokens when API keys are disabled.
+
 This allows connecting to:
 - OpenAI
 - Azure OpenAI
@@ -155,6 +157,18 @@ Profiles are stored in `~/.copilotx/config.json`:
 }
 ```
 
+Optional auth fields for `byok` and `proxy`:
+
+```json
+{
+  "azureCliToken": "auto",
+  "tokenScope": "https://cognitiveservices.azure.com/.default"
+}
+```
+
+- `azureCliToken`: `auto` (default), `on`, or `off`
+- `tokenScope`: Azure token scope for `az account get-access-token`
+
 #### 3. `proxy` - Proxy Configuration
 
 ```json
@@ -193,6 +207,27 @@ The proxy handles:
 - Token acquisition (Microsoft Entra ID)
 - Token refresh
 - RBAC authentication
+
+### Azure OpenAI with RBAC (No API Keys, Local Wrapper)
+
+For environments where API keys are disabled, CopilotX can acquire an Entra token directly using Azure CLI:
+
+```json
+{
+  "name": "azure-rbac-local",
+  "type": "byok",
+  "baseUrl": "https://your-resource.openai.azure.com/openai/deployments/your-deployment",
+  "model": "gpt-4",
+  "providerType": "azure",
+  "azureCliToken": "auto",
+  "tokenScope": "https://cognitiveservices.azure.com/.default"
+}
+```
+
+Behavior:
+- Runs `az account get-access-token` before launching `gh copilot`
+- Auto-detects Azure profiles in `auto` mode when no API key is configured
+- Retries once after refreshing token if auth errors indicate token expiry/failure
 
 Configuration:
 
@@ -233,6 +268,15 @@ gh copilot
 ```bash
 export COPILOT_PROVIDER_BASE_URL=<url>
 export COPILOT_PROVIDER_API_KEY=<key>
+export COPILOT_MODEL=<model>
+gh copilot
+```
+
+### BYOK Mode (Azure CLI Token)
+
+```bash
+export COPILOT_PROVIDER_BASE_URL=<azure-openai-deployment-url>
+export COPILOT_PROVIDER_API_KEY=<token from az account get-access-token>
 export COPILOT_MODEL=<model>
 gh copilot
 ```

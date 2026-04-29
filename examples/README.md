@@ -45,6 +45,34 @@ export AZURE_OPENAI_KEY="your-api-key-here"
 copilotx use azure-gpt4 suggest "create a function to parse JSON"
 ```
 
+### Azure OpenAI with RBAC (API Keys Disabled, Local Wrapper)
+
+```json
+{
+  "name": "azure-rbac-local",
+  "type": "byok",
+  "baseUrl": "https://your-resource.openai.azure.com/openai/deployments/gpt-4",
+  "model": "gpt-4",
+  "providerType": "azure",
+  "azureCliToken": "auto",
+  "tokenScope": "https://cognitiveservices.azure.com/.default"
+}
+```
+
+**Setup**:
+```bash
+az login
+```
+
+**Usage**:
+```bash
+copilotx use azure-rbac-local suggest "create a function to parse JSON"
+```
+
+Notes:
+- `azureCliToken: auto` detects Azure profiles and uses Azure CLI token when API key is not configured.
+- On token/auth failures, CopilotX refreshes token and retries once.
+
 ### OpenAI API
 
 ```json
@@ -279,6 +307,14 @@ Do this:
 ```json
 {
   "apiKeyEnv": "AZURE_OPENAI_KEY"
+}
+```
+
+For keyless Azure RBAC profiles:
+```json
+{
+  "providerType": "azure",
+  "azureCliToken": "auto"
 }
 ```
 
