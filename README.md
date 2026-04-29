@@ -119,7 +119,7 @@ GitHub Copilot CLI can connect to external models via environment variables:
 - `COPILOT_MODEL`
 - `COPILOT_PROVIDER_TYPE`
 
-CopilotX can now source Azure CLI access tokens when API keys are disabled, and sets both `COPILOT_PROVIDER_BEARER_TOKEN` and `COPILOT_PROVIDER_API_KEY` for compatibility.
+CopilotX can now source Azure CLI access tokens when API keys are disabled. In token mode, it sets `COPILOT_PROVIDER_BEARER_TOKEN` and clears `COPILOT_PROVIDER_API_KEY` to avoid auth-mode ambiguity.
 
 This allows connecting to:
 - OpenAI

@@ -133,7 +133,7 @@ async function setEnvironmentForProfile(profile) {
     const useAzureCliToken = shouldUseAzureCliToken(profile, !!resolvedApiKey);
     if (useAzureCliToken) {
       const token = await getAzureCliToken(profile);
-      process.env.COPILOT_PROVIDER_API_KEY = token;
+      delete process.env.COPILOT_PROVIDER_API_KEY;
       process.env.COPILOT_PROVIDER_BEARER_TOKEN = token;
     } else if (resolvedApiKey) {
       process.env.COPILOT_PROVIDER_API_KEY = resolvedApiKey;
@@ -404,7 +404,7 @@ async function executeWithProfile(profileName, copilotArgs = []) {
     if (result.code !== 0 && envInfo.usedAzureCliToken && isTokenFailure(result.output)) {
       console.warn('Detected token-related auth failure. Refreshing Azure CLI token and retrying once...');
       const refreshedToken = await getAzureCliToken(profile);
-      process.env.COPILOT_PROVIDER_API_KEY = refreshedToken;
+      delete process.env.COPILOT_PROVIDER_API_KEY;
       process.env.COPILOT_PROVIDER_BEARER_TOKEN = refreshedToken;
       result = await runCopilot(copilotArgs);
     }

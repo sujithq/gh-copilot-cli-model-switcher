@@ -210,7 +210,7 @@ class Program
             {
                 AnsiConsole.MarkupLine("[yellow]Detected token-related auth failure. Refreshing Azure CLI token and retrying once...[/]");
                 var refreshedToken = await GetAzureCliToken(profile);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", refreshedToken);
+                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", refreshedToken);
                 result = await RunCopilot(copilotArgs);
             }
@@ -359,7 +359,7 @@ class Program
             if (useAzureCliToken)
             {
                 var token = await GetAzureCliToken(profile);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", token);
+                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", token);
             }
             else if (!string.IsNullOrEmpty(resolvedApiKey))
