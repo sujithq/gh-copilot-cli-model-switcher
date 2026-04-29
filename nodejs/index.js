@@ -697,14 +697,60 @@ const argv = yargs(hideBin(process.argv))
       console.log(`* = last used`);
       console.log(`\nConfig file: ${getConfigFile()}`);
 
-      // Prompt to select a profile
+      // Single interactive flow from list: choose Use or Remove.
       if (profiles.length > 0) {
-        const selection = await promptForSelection('\nSelect profile # (or press Enter to exit): ', profiles.length);
-        if (selection) {
-          const selectedProfile = profiles[selection - 1];
-          const code = await executeWithProfile(selectedProfile.name, []);
-          process.exit(code);
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const answer = await new Promise((resolve) => {
+          rl.question('\nAction: [u]se / [r]emove / [Enter] exit: ', (ans) => resolve((ans || '').trim().toLowerCase()));
+        });
+
+        if (!answer) {
+          rl.close();
+          return;
         }
+
+        if (answer === 'u' || answer === 'use') {
+          const selectionRaw = await new Promise((resolve) => {
+            rl.question('Profile #: ', (ans) => resolve((ans || '').trim()));
+          });
+
+          const selection = parseInt(selectionRaw, 10);
+          rl.close();
+
+          if (!isNaN(selection) && selection >= 1 && selection <= profiles.length) {
+            const selectedProfile = profiles[selection - 1];
+            const code = await executeWithProfile(selectedProfile.name, []);
+            process.exit(code);
+            return;
+          }
+
+          console.log('Invalid selection.');
+          return;
+        }
+
+        if (answer === 'r' || answer === 'remove') {
+          rl.close();
+          const removable = profiles.filter((p) => p.name.toLowerCase() !== 'default');
+          const targets = await promptProfilesToRemove(removable);
+
+          if (!targets.length) {
+            console.log('No profiles selected.');
+            return;
+          }
+
+          const result = removeProfiles(targets);
+          if (!result.ok) {
+            console.error('Failed to remove profiles.');
+            process.exit(1);
+            return;
+          }
+
+          console.log(`Removed ${result.removed} profile(s).`);
+          return;
+        }
+
+        rl.close();
+        console.log('Unknown action.');
       }
     }
   )
