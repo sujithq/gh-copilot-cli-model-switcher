@@ -208,7 +208,7 @@ If `azureCliToken` is enabled (or `auto` detects Azure profile with no API key),
 az account get-access-token --scope https://cognitiveservices.azure.com/.default --query accessToken -o tsv
 ```
 
-The returned token is set as `COPILOT_PROVIDER_BEARER_TOKEN` and also mirrored to `COPILOT_PROVIDER_API_KEY` for compatibility.
+The returned token is set as `COPILOT_PROVIDER_BEARER_TOKEN`. `COPILOT_PROVIDER_API_KEY` is cleared in token mode to avoid auth-mode ambiguity.
 
 Retry behavior:
 - If `gh copilot` fails with token/auth-related errors, CopilotX refreshes the token and retries once.
