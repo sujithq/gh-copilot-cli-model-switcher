@@ -10,7 +10,7 @@ const {
   listProfiles,
   setLastUsed,
   getLastUsed,
-  CONFIG_FILE
+  getConfigFile
 } = require('./config');
 
 function isAzureProfile(profile) {
@@ -128,6 +128,201 @@ function isTokenFailure(text) {
   return /(401|unauthorized|forbidden|invalid token|token expired|expired token|authentication failed|permission denied)/i.test(text || '');
 }
 
+function sanitizeProfilePart(value) {
+  return (value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function askQuestion(rl, prompt) {
+  return new Promise((resolve) => rl.question(prompt, resolve));
+}
+
+function runAzJson(args) {
+  return new Promise((resolve, reject) => {
+    const az = spawn('az', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+
+    let stdout = '';
+    let stderr = '';
+
+    az.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    az.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    az.on('error', (error) => {
+      reject(new Error(`Failed to run az CLI: ${error.message}`));
+    });
+
+    az.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`az ${args.join(' ')} failed (exit ${code}): ${stderr.trim()}`));
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(stdout || '[]'));
+      } catch (error) {
+        reject(new Error(`Failed to parse az output: ${error.message}`));
+      }
+    });
+  });
+}
+
+async function listFoundryAccounts(subscription) {
+  const args = ['cognitiveservices', 'account', 'list', '-o', 'json'];
+  if (subscription) {
+    args.push('--subscription', subscription);
+  }
+
+  const accounts = await runAzJson(args);
+  return accounts.filter((account) => {
+    const endpoint = (account.properties?.endpoint || '').toLowerCase();
+    const kind = (account.kind || '').toLowerCase();
+    return endpoint.includes('.openai.azure.com') || kind.includes('openai');
+  });
+}
+
+async function listAccountDeployments(accountName, resourceGroup, subscription) {
+  const args = [
+    'cognitiveservices',
+    'account',
+    'deployment',
+    'list',
+    '--name',
+    accountName,
+    '--resource-group',
+    resourceGroup,
+    '-o',
+    'json'
+  ];
+
+  if (subscription) {
+    args.push('--subscription', subscription);
+  }
+
+  const deployments = await runAzJson(args);
+  return deployments.map((item) => ({
+    deploymentName: item.name,
+    modelName: item.properties?.model?.name || item.model?.name || item.name,
+    modelVersion: item.properties?.model?.version || item.model?.version || '',
+  }));
+}
+
+async function importFoundryProfiles(options) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  try {
+    const accountArg = options.account || options.name || '';
+    const rgArg = options.resourceGroup || options['resource-group'] || '';
+    const subscription = options.subscription || '';
+    const forcedMode = options.all ? 'all' : (options.mode || '');
+
+    let mode = forcedMode;
+    if (!mode) {
+      mode = (await askQuestion(rl, 'Add mode (each/all) [each]: ') || 'each').trim().toLowerCase();
+    }
+    if (mode !== 'all') {
+      mode = 'each';
+    }
+
+    let accounts;
+    if (accountArg && rgArg) {
+      accounts = [{ name: accountArg, resourceGroup: rgArg, properties: {} }];
+    } else {
+      accounts = await listFoundryAccounts(subscription);
+    }
+
+    if (!accounts.length) {
+      console.log('No OpenAI/Foundry accounts found.');
+      return 0;
+    }
+
+    let importedCount = 0;
+    let scannedDeployments = 0;
+
+    for (const account of accounts) {
+      const accountName = account.name;
+      const resourceGroup = account.resourceGroup;
+      const endpoint = (account.properties?.endpoint || `https://${accountName}.openai.azure.com`).replace(/\/$/, '');
+
+      if (!resourceGroup) {
+        console.warn(`Skipping account ${accountName}: resource group not found.`);
+        continue;
+      }
+
+      let deployments;
+      try {
+        deployments = await listAccountDeployments(accountName, resourceGroup, subscription);
+      } catch (error) {
+        console.warn(`Skipping ${accountName}: ${error.message}`);
+        continue;
+      }
+
+      if (!deployments.length) {
+        continue;
+      }
+
+      console.log(`\nAccount: ${accountName} (${resourceGroup})`);
+
+      for (const dep of deployments) {
+        scannedDeployments += 1;
+
+        const modelLabel = dep.modelVersion ? `${dep.modelName}:${dep.modelVersion}` : dep.modelName;
+        let shouldAdd = mode === 'all';
+
+        if (!shouldAdd) {
+          const answer = await askQuestion(
+            rl,
+            `Add deployment ${dep.deploymentName} (${modelLabel}) as profile? (y/N): `
+          );
+          shouldAdd = (answer || '').trim().toLowerCase() === 'y';
+        }
+
+        if (!shouldAdd) {
+          continue;
+        }
+
+        const profileName = `foundry-${sanitizeProfilePart(accountName)}-${sanitizeProfilePart(dep.deploymentName)}`;
+
+        const profile = {
+          name: profileName,
+          type: 'byok',
+          baseUrl: `${endpoint}/openai/deployments/${dep.deploymentName}`,
+          model: dep.modelName,
+          providerType: 'azure',
+          azureCliToken: 'auto',
+          tokenScope: 'https://cognitiveservices.azure.com/.default'
+        };
+
+        if (addProfile(profile)) {
+          importedCount += 1;
+          console.log(`  Added profile: ${profileName}`);
+        } else {
+          console.warn(`  Failed to add profile: ${profileName}`);
+        }
+      }
+    }
+
+    console.log(`\nImported ${importedCount} profile(s) from ${scannedDeployments} deployment(s).`);
+    return 0;
+  } catch (error) {
+    console.error(`Error importing Foundry profiles: ${error.message}`);
+    console.error('Ensure Azure CLI is installed and authenticated: az login');
+    return 1;
+  } finally {
+    rl.close();
+  }
+}
+
 function runCopilot(copilotArgs) {
   return new Promise((resolve, reject) => {
     const copilot = spawn('gh', ['copilot', ...copilotArgs], {
@@ -232,7 +427,7 @@ const argv = yargs(hideBin(process.argv))
       });
 
       console.log(`* = last used`);
-      console.log(`\nConfig file: ${CONFIG_FILE}`);
+      console.log(`\nConfig file: ${getConfigFile()}`);
     }
   )
   .command(
@@ -358,6 +553,39 @@ const argv = yargs(hideBin(process.argv))
       } finally {
         rl.close();
       }
+    }
+  )
+  .command(
+    'import-foundry',
+    'Import profiles from deployed models in Foundry/Azure OpenAI accounts',
+    (yargs) => {
+      yargs
+        .option('account', {
+          type: 'string',
+          describe: 'Account name to import from'
+        })
+        .option('resource-group', {
+          type: 'string',
+          describe: 'Resource group of the account'
+        })
+        .option('subscription', {
+          type: 'string',
+          describe: 'Subscription ID or name'
+        })
+        .option('mode', {
+          type: 'string',
+          choices: ['each', 'all'],
+          describe: 'Prompt for each deployment or add all'
+        })
+        .option('all', {
+          type: 'boolean',
+          default: false,
+          describe: 'Add all discovered deployments without prompts'
+        });
+    },
+    async (argv) => {
+      const code = await importFoundryProfiles(argv);
+      process.exit(code);
     }
   )
   .command(

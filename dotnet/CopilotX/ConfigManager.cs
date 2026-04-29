@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Diagnostics;
 
 namespace CopilotX;
 
@@ -49,7 +50,102 @@ public class ConfigManager
         ".copilotx"
     );
 
-    private static readonly string ConfigFile = Path.Combine(ConfigDir, "config.json");
+    private static string SanitizeSegment(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "unknown";
+        }
+
+        var chars = value
+            .ToLowerInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) || ch == '@' || ch == '.' || ch == '_' || ch == '-' ? ch : '_')
+            .ToArray();
+
+        return new string(chars);
+    }
+
+    private static string? GetAzureIdentityKey()
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "az",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = false
+            };
+
+            startInfo.ArgumentList.Add("account");
+            startInfo.ArgumentList.Add("show");
+            startInfo.ArgumentList.Add("-o");
+            startInfo.ArgumentList.Add("json");
+
+            var process = Process.Start(startInfo);
+            if (process == null)
+            {
+                return null;
+            }
+
+            var stdout = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+
+            if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(stdout))
+            {
+                return null;
+            }
+
+            using var doc = JsonDocument.Parse(stdout);
+            var root = doc.RootElement;
+
+            var tenantId = root.TryGetProperty("tenantId", out var tenantProp)
+                ? SanitizeSegment(tenantProp.GetString() ?? string.Empty)
+                : string.Empty;
+
+            var userName = string.Empty;
+            if (root.TryGetProperty("user", out var userObj) && userObj.TryGetProperty("name", out var nameProp))
+            {
+                userName = SanitizeSegment(nameProp.GetString() ?? string.Empty);
+            }
+
+            if (string.IsNullOrWhiteSpace(tenantId) || string.IsNullOrWhiteSpace(userName))
+            {
+                return null;
+            }
+
+            return $"{tenantId}__{userName}";
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    internal static string ResolveConfigFileFor(string configDir, string scope, string? identityKey)
+    {
+        var normalizedScope = (scope ?? "auto").ToLowerInvariant();
+
+        if (normalizedScope == "global")
+        {
+            return Path.Combine(configDir, "config.json");
+        }
+
+        if ((normalizedScope == "azure-user" || normalizedScope == "auto")
+            && !string.IsNullOrWhiteSpace(identityKey))
+        {
+            return Path.Combine(configDir, $"config.{identityKey}.json");
+        }
+
+        return Path.Combine(configDir, "config.json");
+    }
+
+    private static string ResolveConfigFile()
+    {
+        var scope = (Environment.GetEnvironmentVariable("COPILOTX_CONFIG_SCOPE") ?? "auto").ToLowerInvariant();
+        var identityKey = GetAzureIdentityKey();
+        return ResolveConfigFileFor(ConfigDir, scope, identityKey);
+    }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -83,7 +179,9 @@ public class ConfigManager
     {
         EnsureConfigDir();
 
-        if (!File.Exists(ConfigFile))
+        var configFile = ResolveConfigFile();
+
+        if (!File.Exists(configFile))
         {
             SaveConfig(DefaultConfig);
             return DefaultConfig;
@@ -91,7 +189,7 @@ public class ConfigManager
 
         try
         {
-            var json = File.ReadAllText(ConfigFile);
+            var json = File.ReadAllText(configFile);
             return JsonSerializer.Deserialize<Config>(json, JsonOptions) ?? DefaultConfig;
         }
         catch (Exception ex)
@@ -105,10 +203,12 @@ public class ConfigManager
     {
         EnsureConfigDir();
 
+        var configFile = ResolveConfigFile();
+
         try
         {
             var json = JsonSerializer.Serialize(config, JsonOptions);
-            File.WriteAllText(ConfigFile, json);
+            File.WriteAllText(configFile, json);
             return true;
         }
         catch (Exception ex)
@@ -162,6 +262,6 @@ public class ConfigManager
 
     public static string GetConfigFile()
     {
-        return ConfigFile;
+        return ResolveConfigFile();
     }
 }

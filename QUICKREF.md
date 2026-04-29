@@ -12,6 +12,18 @@ cd nodejs && npm install && npm link
 cd dotnet/CopilotX && dotnet pack && dotnet tool install --global --add-source ./nupkg CopilotX
 ```
 
+## Testing
+
+### Node.js
+```bash
+cd nodejs && npm test
+```
+
+### .NET (Microsoft Testing Platform)
+```bash
+cd dotnet/CopilotX.Tests && dotnet test
+```
+
 ## Commands
 
 | Command | Description | Example |
@@ -21,6 +33,7 @@ cd dotnet/CopilotX && dotnet pack && dotnet tool install --global --add-source .
 | `copilotx last` | Use last profile | `copilotx last` |
 | `copilotx default` | Use default Copilot | `copilotx default` |
 | `copilotx add` | Add new profile | `copilotx add` |
+| `copilotx import-foundry` | Import from Foundry deployments | `copilotx import-foundry --mode each` |
 | `copilotx help` | Show help | `copilotx help` |
 
 ## Profile Types
@@ -139,9 +152,24 @@ copilotx last suggest "..."
 copilotx last explain "..."
 ```
 
+### Import Foundry Deployments
+```bash
+# Prompt for each discovered deployment
+copilotx import-foundry --mode each
+
+# Add all discovered deployments
+copilotx import-foundry --all
+
+# Import from one account/resource group
+copilotx import-foundry --account myfoundry --resource-group my-rg --all
+```
+
 ## Files
 
-- **Config**: `~/.copilotx/config.json`
+- **Config (active)**: shown by `copilotx list`
+- **Global config**: `~/.copilotx/config.json`
+- **Azure user-scoped config**: `~/.copilotx/config.<tenantId>__<userName>.json`
+- **Scope override**: `COPILOTX_CONFIG_SCOPE=auto|azure-user|global`
 - **Node.js**: `/nodejs`
 - **.NET**: `/dotnet/CopilotX`
 - **Examples**: `/examples`

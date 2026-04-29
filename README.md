@@ -42,6 +42,26 @@ npm link
 copilotx list
 ```
 
+## ✅ Testing
+
+### Node.js unit tests
+
+```bash
+cd nodejs
+npm test
+```
+
+Uses Node's built-in test runner (`node --test`).
+
+### .NET unit tests (Microsoft Testing Platform)
+
+```bash
+cd dotnet/CopilotX.Tests
+dotnet test
+```
+
+The `.NET` test project uses MSTest with `UseMicrosoftTestingPlatformRunner=true`.
+
 ### .NET Version
 
 ```bash
@@ -70,6 +90,15 @@ copilotx last
 
 # Use default Copilot
 copilotx default
+
+# Import profiles from Foundry/Azure OpenAI deployments
+copilotx import-foundry --mode each
+
+# Import all discovered deployments from all applicable accounts
+copilotx import-foundry --all
+
+# Import from one account/resource group
+copilotx import-foundry --account myfoundry --resource-group my-rg --all
 ```
 
 ## 🧱 Core Concepts
@@ -105,7 +134,19 @@ Any model used must support:
 
 ## 📝 Configuration
 
-Profiles are stored in `~/.copilotx/config.json`:
+Profiles are stored in an active config file under `~/.copilotx/`.
+
+Config scope behavior:
+- `COPILOTX_CONFIG_SCOPE=auto` (default): use Azure user-scoped config when `az account show` is available, otherwise global config
+- `COPILOTX_CONFIG_SCOPE=azure-user`: always use Azure user-scoped config
+- `COPILOTX_CONFIG_SCOPE=global`: always use `~/.copilotx/config.json`
+
+In Azure user-scoped mode, file name format is:
+- `~/.copilotx/config.<tenantId>__<userName>.json`
+
+Use `copilotx list` to see which config file is currently active.
+
+Example JSON content:
 
 ```json
 {
@@ -283,6 +324,31 @@ gh copilot
 
 CopilotX handles this switching automatically based on the selected profile.
 
+## 🧭 Import From Foundry
+
+Use `import-foundry` to discover deployed models and generate `byok` profiles automatically.
+
+Each imported profile is configured with:
+- `providerType: "azure"`
+- `azureCliToken: "auto"`
+- `tokenScope: "https://cognitiveservices.azure.com/.default"`
+
+Examples:
+
+```bash
+# Scan all accounts and prompt per deployment
+copilotx import-foundry --mode each
+
+# Scan all accounts and add all discovered deployments
+copilotx import-foundry --all
+
+# Target one account/resource group
+copilotx import-foundry --account myfoundry --resource-group my-rg --mode each
+
+# Scope by subscription
+copilotx import-foundry --subscription <subscription-id> --all
+```
+
 ## 📚 Examples
 
 ### Adding a Profile
@@ -350,6 +416,7 @@ Return Result
 2. **API Key Security**: Use `apiKeyEnv` instead of `apiKey` in profiles
 3. **File Permissions**: Ensure `~/.copilotx/config.json` has appropriate permissions
 4. **Enterprise RBAC**: Use proxy layer for token-based authentication
+5. **Identity Separation**: Azure user-scoped config keeps profiles separate when switching users with `az login`
 
 ## 🚀 Future Enhancements
 

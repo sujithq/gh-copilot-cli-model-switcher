@@ -87,9 +87,32 @@ Interactive wizard with Spectre.Console prompts to add or update a profile. Feat
 - Secure password input for API keys
 - Validation and user-friendly error messages
 
+### Import profiles from Foundry deployments
+
+```bash
+# Scan all applicable accounts and prompt per deployment
+copilotx import-foundry --mode each
+
+# Add all deployments without prompt
+copilotx import-foundry --all
+
+# Target one account/resource group
+copilotx import-foundry --account myfoundry --resource-group my-rg --all
+```
+
 ## Configuration
 
-Profiles are stored in `~/.copilotx/config.json`.
+Profiles are stored in an active config file under `~/.copilotx/`.
+
+Config scope behavior:
+- `COPILOTX_CONFIG_SCOPE=auto` (default): use Azure user-scoped config when `az account show` is available, otherwise global config
+- `COPILOTX_CONFIG_SCOPE=azure-user`: always use Azure user-scoped config
+- `COPILOTX_CONFIG_SCOPE=global`: always use `~/.copilotx/config.json`
+
+In Azure user-scoped mode, file name format is:
+- `~/.copilotx/config.<tenantId>__<userName>.json`
+
+Use `copilotx list` to see which config file is currently active.
 
 ### Example Configuration
 
@@ -241,6 +264,16 @@ Requirements:
 - Azure CLI installed
 - Logged in: `az login`
 
+## Import From Foundry
+
+`import-foundry` uses Azure CLI to discover deployments and create/update profiles in `~/.copilotx/config.json`.
+
+Imported profiles are created as:
+- `type: "byok"`
+- `providerType: "azure"`
+- `azureCliToken: "auto"`
+- `tokenScope: "https://cognitiveservices.azure.com/.default"`
+
 ### Ollama Local
 
 ```json
@@ -291,6 +324,14 @@ dotnet run -- add
 ```bash
 dotnet pack
 ```
+
+### Test
+
+```bash
+dotnet test ../CopilotX.Tests/CopilotX.Tests.csproj
+```
+
+Unit tests use MSTest on Microsoft Testing Platform (`UseMicrosoftTestingPlatformRunner=true`).
 
 ## Features
 
