@@ -53,7 +53,7 @@ Full release instructions: [../../RELEASING.md](../../RELEASING.md)
 
 ## Prerequisites
 
-- .NET 10 SDK or higher (compatible with .NET 6+)
+- .NET 10 SDK or higher
 - GitHub Copilot CLI installed: `gh extension install github/gh-copilot`
 
 ## Usage
