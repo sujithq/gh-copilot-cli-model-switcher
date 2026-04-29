@@ -176,6 +176,7 @@ copilotx import-foundry [options]
 
 Discovers Azure OpenAI / Foundry accounts and deployments via Azure CLI and creates CopilotX profiles.
 
+Only chat-capable deployments are imported (embeddings are skipped).
 On re-import, equivalent profiles are deduplicated automatically.
 
 **Options:**

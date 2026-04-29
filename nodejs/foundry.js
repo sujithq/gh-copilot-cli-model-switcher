@@ -27,6 +27,24 @@ function mapDeployment(item) {
   };
 }
 
+function isChatCapableDeployment(item) {
+  const capabilities = item && item.properties && item.properties.capabilities || {};
+  const chatCompletion = String(capabilities.chatCompletion || '').toLowerCase() === 'true';
+  const responses = String(capabilities.responses || '').toLowerCase() === 'true';
+
+  if (chatCompletion || responses) {
+    return true;
+  }
+
+  // Fallback when capabilities are absent: exclude known embedding models.
+  const modelName = ((item && item.properties && item.properties.model && item.properties.model.name)
+    || (item && item.model && item.model.name)
+    || (item && item.name)
+    || '').toLowerCase();
+
+  return !modelName.includes('embedding');
+}
+
 function buildUniqueProfileName(accountName, deploymentName, existingNames) {
   const baseName = `foundry-${sanitizeProfilePart(accountName)}-${sanitizeProfilePart(deploymentName)}`;
   const taken = new Set(existingNames || []);
@@ -62,6 +80,7 @@ function buildImportedProfile(accountName, endpoint, deployment, existingNames) 
 module.exports = {
   sanitizeProfilePart,
   isApplicableAccount,
+  isChatCapableDeployment,
   mapDeployment,
   buildUniqueProfileName,
   buildImportedProfile

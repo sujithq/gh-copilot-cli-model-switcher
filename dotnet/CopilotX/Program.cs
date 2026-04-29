@@ -1164,6 +1164,11 @@ class Program
             var result = new List<FoundryDeployment>();
             foreach (var item in doc.RootElement.EnumerateArray())
             {
+                if (!FoundryImportHelpers.IsChatCapableDeployment(item))
+                {
+                    continue;
+                }
+
                 var deployment = FoundryImportHelpers.MapDeployment(item);
                 if (!string.IsNullOrWhiteSpace(deployment.DeploymentName))
                 {

@@ -10,6 +10,7 @@ const readline = require('readline');
 const {
   sanitizeProfilePart,
   isApplicableAccount,
+  isChatCapableDeployment,
   mapDeployment,
   buildImportedProfile
 } = require('./foundry');
@@ -435,7 +436,10 @@ async function listAccountDeployments(accountName, resourceGroup, subscription) 
   }
 
   const deployments = await runAzJson(args);
-  return deployments.map(mapDeployment).filter((item) => item.deploymentName);
+  return deployments
+    .filter(isChatCapableDeployment)
+    .map(mapDeployment)
+    .filter((item) => item.deploymentName);
 }
 
 async function importFoundryProfiles(options) {
