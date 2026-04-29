@@ -338,8 +338,8 @@ class Program
     {
         var discovered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Strategy 1: VS Code user settings.json / mcp.json
-        foreach (var settingsPath in GetVsCodeSettingsPaths())
+        // Strategy 1: Project-level then user-level settings.json / mcp.json
+        foreach (var settingsPath in GetMcpConfigPaths())
         {
             try
             {
@@ -394,26 +394,54 @@ class Program
         return [.. discovered];
     }
 
-    static IEnumerable<string> GetVsCodeSettingsPaths()
+    static IEnumerable<string> GetMcpConfigPaths()
     {
+        // 1) Project/workspace-level config first (walk up from current directory)
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        static bool AddSeen(HashSet<string> set, string p) => set.Add(Path.GetFullPath(p));
+
+        var dir = Environment.CurrentDirectory;
+        while (true)
+        {
+            var p1 = Path.Combine(dir, "mcp.json");
+            if (AddSeen(seen, p1)) yield return p1;
+
+            var p2 = Path.Combine(dir, ".vscode", "mcp.json");
+            if (AddSeen(seen, p2)) yield return p2;
+
+            var p3 = Path.Combine(dir, ".vscode", "settings.json");
+            if (AddSeen(seen, p3)) yield return p3;
+
+            var parent = Directory.GetParent(dir);
+            if (parent == null) break;
+            dir = parent.FullName;
+        }
+
+        // 2) User-level config next
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (OperatingSystem.IsWindows())
         {
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            yield return Path.Combine(appData, "Code", "User", "settings.json");
-            yield return Path.Combine(appData, "Code", "User", "mcp.json");
+            var p1 = Path.Combine(appData, "Code", "User", "settings.json");
+            if (AddSeen(seen, p1)) yield return p1;
+            var p2 = Path.Combine(appData, "Code", "User", "mcp.json");
+            if (AddSeen(seen, p2)) yield return p2;
         }
         else if (OperatingSystem.IsMacOS())
         {
             var base2 = Path.Combine(home, "Library", "Application Support", "Code", "User");
-            yield return Path.Combine(base2, "settings.json");
-            yield return Path.Combine(base2, "mcp.json");
+            var p1 = Path.Combine(base2, "settings.json");
+            if (AddSeen(seen, p1)) yield return p1;
+            var p2 = Path.Combine(base2, "mcp.json");
+            if (AddSeen(seen, p2)) yield return p2;
         }
         else
         {
             var base2 = Path.Combine(home, ".config", "Code", "User");
-            yield return Path.Combine(base2, "settings.json");
-            yield return Path.Combine(base2, "mcp.json");
+            var p1 = Path.Combine(base2, "settings.json");
+            if (AddSeen(seen, p1)) yield return p1;
+            var p2 = Path.Combine(base2, "mcp.json");
+            if (AddSeen(seen, p2)) yield return p2;
         }
     }
 
