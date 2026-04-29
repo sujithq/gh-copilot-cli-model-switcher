@@ -44,6 +44,12 @@ copilotx list
 
 ## ✅ Testing
 
+### Run all tests (one command)
+
+```powershell
+./run-tests.ps1
+```
+
 ### Node.js unit tests
 
 ```bash
