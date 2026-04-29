@@ -128,7 +128,8 @@ ELSE IF profile.type == 'byok' OR 'proxy':
 
     IF azureCliToken enabled:
         RUN az account get-access-token
-        SET COPILOT_PROVIDER_API_KEY = <token>
+        SET COPILOT_PROVIDER_BEARER_TOKEN = <token>
+        UNSET COPILOT_PROVIDER_API_KEY
     ELSE IF apiKey is present:
         SET COPILOT_PROVIDER_API_KEY = apiKey
 
