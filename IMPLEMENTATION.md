@@ -18,6 +18,9 @@ This repository now contains a complete implementation of the CopilotX CLI tool 
 - ✅ Profile management (list, add, use, last, default)
 - ✅ Interactive prompts for profile creation
 - ✅ Environment variable configuration
+- ✅ Azure CLI token auth mode for keyless Azure RBAC profiles
+- ✅ Auto-detect Azure profiles in token `auto` mode when API key is absent
+- ✅ One-time retry with token refresh on auth/token expiry failures
 - ✅ Config persistence in `~/.copilotx/config.json`
 - ✅ Support for copilot, byok, and proxy profile types
 - ✅ Argument forwarding to `gh copilot`
@@ -48,6 +51,8 @@ This repository now contains a complete implementation of the CopilotX CLI tool 
   - Secure password input
 - ✅ Strongly typed configuration classes
 - ✅ .NET Global Tool packaging
+- ✅ Azure CLI token auth mode for keyless Azure RBAC profiles
+- ✅ One-time retry with token refresh on auth/token expiry failures
 
 **Testing**:
 - ✅ Successfully built without errors

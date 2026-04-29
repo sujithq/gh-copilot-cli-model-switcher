@@ -13,12 +13,75 @@ const {
   CONFIG_FILE
 } = require('./config');
 
-function setEnvironmentForProfile(profile) {
+function isAzureProfile(profile) {
+  const baseUrl = (profile.baseUrl || '').toLowerCase();
+  const providerType = (profile.providerType || '').toLowerCase();
+  return baseUrl.includes('.openai.azure.com') || providerType === 'azure';
+}
+
+function shouldUseAzureCliToken(profile, hasApiKey) {
+  const mode = (profile.azureCliToken || 'auto').toLowerCase();
+
+  if (mode === 'on') {
+    return true;
+  }
+
+  if (mode === 'off') {
+    return false;
+  }
+
+  return !hasApiKey && isAzureProfile(profile);
+}
+
+function getAzureCliToken(profile) {
+  const scope = profile.tokenScope || 'https://cognitiveservices.azure.com/.default';
+
+  return new Promise((resolve, reject) => {
+    const az = spawn(
+      'az',
+      ['account', 'get-access-token', '--scope', scope, '--query', 'accessToken', '-o', 'tsv'],
+      { stdio: ['ignore', 'pipe', 'pipe'] }
+    );
+
+    let stdout = '';
+    let stderr = '';
+
+    az.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    az.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    az.on('error', (error) => {
+      reject(new Error(`Failed to run az CLI: ${error.message}`));
+    });
+
+    az.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`az account get-access-token failed (exit ${code}): ${stderr.trim()}`));
+        return;
+      }
+
+      const token = stdout.trim();
+      if (!token) {
+        reject(new Error('az CLI returned an empty access token'));
+        return;
+      }
+
+      resolve(token);
+    });
+  });
+}
+
+async function setEnvironmentForProfile(profile) {
   if (profile.type === 'copilot') {
     delete process.env.COPILOT_PROVIDER_BASE_URL;
     delete process.env.COPILOT_PROVIDER_API_KEY;
     delete process.env.COPILOT_MODEL;
     delete process.env.COPILOT_PROVIDER_TYPE;
+    return { usedAzureCliToken: false };
   } else if (profile.type === 'byok' || profile.type === 'proxy') {
     if (profile.baseUrl) {
       process.env.COPILOT_PROVIDER_BASE_URL = profile.baseUrl;
@@ -28,51 +91,115 @@ function setEnvironmentForProfile(profile) {
       process.env.COPILOT_MODEL = profile.model;
     }
 
+    let resolvedApiKey = '';
+
     if (profile.apiKeyEnv) {
       const apiKey = process.env[profile.apiKeyEnv];
       if (apiKey) {
-        process.env.COPILOT_PROVIDER_API_KEY = apiKey;
+        resolvedApiKey = apiKey;
       } else {
         console.warn(`Warning: Environment variable ${profile.apiKeyEnv} is not set`);
       }
     } else if (profile.apiKey) {
-      process.env.COPILOT_PROVIDER_API_KEY = profile.apiKey;
+      resolvedApiKey = profile.apiKey;
+    }
+
+    const useAzureCliToken = shouldUseAzureCliToken(profile, !!resolvedApiKey);
+    if (useAzureCliToken) {
+      const token = await getAzureCliToken(profile);
+      process.env.COPILOT_PROVIDER_API_KEY = token;
+    } else if (resolvedApiKey) {
+      process.env.COPILOT_PROVIDER_API_KEY = resolvedApiKey;
+    } else {
+      delete process.env.COPILOT_PROVIDER_API_KEY;
     }
 
     if (profile.providerType) {
       process.env.COPILOT_PROVIDER_TYPE = profile.providerType;
     }
+
+    return { usedAzureCliToken: useAzureCliToken };
   }
+
+  return { usedAzureCliToken: false };
 }
 
-function executeWithProfile(profileName, copilotArgs = []) {
+function isTokenFailure(text) {
+  return /(401|unauthorized|forbidden|invalid token|token expired|expired token|authentication failed|permission denied)/i.test(text || '');
+}
+
+function runCopilot(copilotArgs) {
+  return new Promise((resolve, reject) => {
+    const copilot = spawn('gh', ['copilot', ...copilotArgs], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: process.env
+    });
+
+    let combined = '';
+
+    process.stdin.pipe(copilot.stdin);
+
+    copilot.stdout.on('data', (chunk) => {
+      const text = chunk.toString();
+      combined += text;
+      process.stdout.write(text);
+    });
+
+    copilot.stderr.on('data', (chunk) => {
+      const text = chunk.toString();
+      combined += text;
+      process.stderr.write(text);
+    });
+
+    copilot.on('error', (error) => {
+      reject(error);
+    });
+
+    copilot.on('close', (code) => {
+      process.stdin.unpipe(copilot.stdin);
+      resolve({ code: code || 0, output: combined });
+    });
+  });
+}
+
+async function executeWithProfile(profileName, copilotArgs = []) {
   const profile = getProfile(profileName);
 
   if (!profile) {
     console.error(`Profile "${profileName}" not found.`);
     console.error('Use "copilotx list" to see available profiles.');
-    process.exit(1);
+    return 1;
   }
 
   console.log(`Using profile: ${profile.name} (${profile.type})`);
 
-  setEnvironmentForProfile(profile);
+  let envInfo;
+  try {
+    envInfo = await setEnvironmentForProfile(profile);
+  } catch (error) {
+    console.error(`Error setting auth environment: ${error.message}`);
+    console.error('For Azure CLI token auth, ensure az is installed and you are logged in: az login');
+    return 1;
+  }
+
   setLastUsed(profileName);
 
-  const copilot = spawn('gh', ['copilot', ...copilotArgs], {
-    stdio: 'inherit',
-    env: process.env
-  });
+  try {
+    let result = await runCopilot(copilotArgs);
 
-  copilot.on('error', (error) => {
+    if (result.code !== 0 && envInfo.usedAzureCliToken && isTokenFailure(result.output)) {
+      console.warn('Detected token-related auth failure. Refreshing Azure CLI token and retrying once...');
+      const refreshedToken = await getAzureCliToken(profile);
+      process.env.COPILOT_PROVIDER_API_KEY = refreshedToken;
+      result = await runCopilot(copilotArgs);
+    }
+
+    return result.code;
+  } catch (error) {
     console.error('Error executing gh copilot:', error.message);
     console.error('Make sure GitHub Copilot CLI is installed: gh extension install github/gh-copilot');
-    process.exit(1);
-  });
-
-  copilot.on('close', (code) => {
-    process.exit(code || 0);
-  });
+    return 1;
+  }
 }
 
 const argv = yargs(hideBin(process.argv))
@@ -123,8 +250,9 @@ const argv = yargs(hideBin(process.argv))
           default: []
         });
     },
-    (argv) => {
-      executeWithProfile(argv.profile, argv['copilot-args'] || []);
+    async (argv) => {
+      const code = await executeWithProfile(argv.profile, argv['copilot-args'] || []);
+      process.exit(code);
     }
   )
   .command(
@@ -137,13 +265,14 @@ const argv = yargs(hideBin(process.argv))
         default: []
       });
     },
-    (argv) => {
+    async (argv) => {
       const lastUsed = getLastUsed();
       if (!lastUsed) {
         console.error('No profile has been used yet.');
         process.exit(1);
       }
-      executeWithProfile(lastUsed, argv['copilot-args'] || []);
+      const code = await executeWithProfile(lastUsed, argv['copilot-args'] || []);
+      process.exit(code);
     }
   )
   .command(
@@ -203,6 +332,18 @@ const argv = yargs(hideBin(process.argv))
           if (providerType.trim()) {
             profile.providerType = providerType.trim();
           }
+
+          const azureCliToken = await question('Azure CLI token mode (auto/on/off) [auto]: ') || 'auto';
+          if (azureCliToken.trim()) {
+            profile.azureCliToken = azureCliToken.trim().toLowerCase();
+          }
+
+          if (profile.azureCliToken === 'auto' || profile.azureCliToken === 'on') {
+            const tokenScope = await question('Azure token scope [https://cognitiveservices.azure.com/.default]: ');
+            if (tokenScope.trim()) {
+              profile.tokenScope = tokenScope.trim();
+            }
+          }
         }
 
         if (addProfile(profile)) {
@@ -229,8 +370,9 @@ const argv = yargs(hideBin(process.argv))
         default: []
       });
     },
-    (argv) => {
-      executeWithProfile('default', argv['copilot-args'] || []);
+    async (argv) => {
+      const code = await executeWithProfile('default', argv['copilot-args'] || []);
+      process.exit(code);
     }
   )
   .demandCommand(1, 'You need at least one command')
