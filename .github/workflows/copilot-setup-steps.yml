@@ -1,0 +1,44 @@
+name: Copilot Setup Steps
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # This job name is required for Copilot cloud agent to pick up setup steps.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: nodejs/package-lock.json
+
+      - name: Install Node.js dependencies
+        working-directory: nodejs
+        run: npm ci
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore .NET dependencies
+        run: |
+          dotnet restore dotnet/CopilotX/CopilotX.csproj --nologo
+          dotnet restore dotnet/CopilotX.Tests/CopilotX.Tests.csproj --nologo
