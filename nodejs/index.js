@@ -486,7 +486,9 @@ const argv = yargs(hideBin(process.argv))
   .command(
     'list',
     'List all available profiles',
-    () => {},
+    (yargs) => {
+      yargs.example('$0 list', 'Show all profiles; enter a number to launch one interactively');
+    },
     async (argv) => {
       const profiles = listProfiles();
       const lastUsed = getLastUsed();
@@ -536,7 +538,12 @@ const argv = yargs(hideBin(process.argv))
           describe: 'Arguments to pass to gh copilot',
           type: 'array',
           default: []
-        });
+        })
+        .example('$0 use azure-gpt', 'Interactive mode with the azure-gpt profile')
+        .example('$0 use azure-gpt suggest "how to list files"', 'Pass a sub-command to gh copilot')
+        .example('$0 use azure-gpt -p "fix the failing tests"', 'Non-interactive prompt mode')
+        .example('$0 use azure-gpt -p "refactor this" --allow-tool=write', 'Restrict to the write tool only')
+        .example('$0 use azure-gpt -p "explain this" --deny-tool=run_command', 'Deny a specific tool');
     },
     async (argv) => {
       const code = await executeWithProfile(argv.profile, argv['copilot-args'] || []);
@@ -547,11 +554,15 @@ const argv = yargs(hideBin(process.argv))
     'last [copilot-args..]',
     'Use the last used profile and run gh copilot',
     (yargs) => {
-      yargs.positional('copilot-args', {
-        describe: 'Arguments to pass to gh copilot',
-        type: 'array',
-        default: []
-      });
+      yargs
+        .positional('copilot-args', {
+          describe: 'Arguments to pass to gh copilot',
+          type: 'array',
+          default: []
+        })
+        .example('$0 last', 'Interactive mode with the last used profile')
+        .example('$0 last -p "explain this code"', 'Non-interactive prompt mode')
+        .example('$0 last suggest "how to list files"', 'Pass a sub-command to gh copilot');
     },
     async (argv) => {
       const lastUsed = getLastUsed();
@@ -566,7 +577,9 @@ const argv = yargs(hideBin(process.argv))
   .command(
     'add',
     'Add or update a profile interactively',
-    () => {},
+    (yargs) => {
+      yargs.example('$0 add', 'Start the interactive wizard to add or update a profile');
+    },
     async () => {
       const rl = readline.createInterface({
         input: process.stdin,
@@ -674,7 +687,12 @@ const argv = yargs(hideBin(process.argv))
           type: 'boolean',
           default: false,
           describe: 'Add all discovered deployments without prompts'
-        });
+        })
+        .example('$0 import-foundry', 'Discover all accounts and prompt per deployment')
+        .example('$0 import-foundry --all', 'Import all discovered deployments without prompts')
+        .example('$0 import-foundry --mode each', 'Explicitly prompt for each deployment')
+        .example('$0 import-foundry --account myfoundry --resource-group my-rg --all', 'Target one specific account')
+        .example('$0 import-foundry --subscription 00000000-0000-0000-0000-000000000000 --all', 'Scope to a specific subscription');
     },
     async (argv) => {
       const code = await importFoundryProfiles(argv);
@@ -685,17 +703,25 @@ const argv = yargs(hideBin(process.argv))
     'default [copilot-args..]',
     'Use the default Copilot profile',
     (yargs) => {
-      yargs.positional('copilot-args', {
-        describe: 'Arguments to pass to gh copilot',
-        type: 'array',
-        default: []
-      });
+      yargs
+        .positional('copilot-args', {
+          describe: 'Arguments to pass to gh copilot',
+          type: 'array',
+          default: []
+        })
+        .example('$0 default', 'Interactive mode with the default Copilot profile')
+        .example('$0 default -p "explain this code"', 'Non-interactive prompt mode')
+        .example('$0 default suggest "how to list files"', 'Pass a sub-command to gh copilot');
     },
     async (argv) => {
       const code = await executeWithProfile('default', argv['copilot-args'] || []);
       process.exit(code);
     }
   )
+  .example('$0 list', 'List all profiles; select a number to launch one interactively')
+  .example('$0 use azure-gpt -p "fix the tests"', 'Run a prompt with a specific profile')
+  .example('$0 last', 'Use the most recently used profile interactively')
+  .example('$0 import-foundry --all', 'Import all Foundry deployments as profiles')
   .demandCommand(1, 'You need at least one command')
   .help()
   .alias('h', 'help')
