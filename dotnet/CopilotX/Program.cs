@@ -162,25 +162,68 @@ class Program
         AnsiConsole.MarkupLine("\n[dim]* = last used[/]");
         AnsiConsole.MarkupLine($"[dim]Config file: {ConfigManager.GetConfigFile()}[/]");
 
-        // Prompt to select a profile (only if stdin is interactive)
+        // Single interactive flow from list: choose Use or Remove.
         if (profileList.Count > 0 && Console.IsInputRedirected == false)
         {
             AnsiConsole.MarkupLine("");
-            while (true)
-            {
-                var input = AnsiConsole.Ask<string>("[yellow]Select profile # (or press Enter to exit):[/] ").Trim();
-                if (string.IsNullOrEmpty(input))
-                {
-                    break;
-                }
+            var action = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Action:")
+                    .AddChoices(new[]
+                    {
+                        "Use profile",
+                        "Remove profile(s)",
+                        "Exit"
+                    }));
 
+            if (action == "Use profile")
+            {
+                var input = AnsiConsole.Ask<string>("[yellow]Profile #[/]: ").Trim();
                 if (int.TryParse(input, out var selection) && selection > 0 && selection <= profileList.Count)
                 {
                     var selectedProfile = profileList[selection - 1];
                     return UseCommand(new[] { selectedProfile.Name });
                 }
 
-                AnsiConsole.MarkupLine("[red]Invalid selection. Please try again.[/]");
+                AnsiConsole.MarkupLine("[red]Invalid selection.[/]");
+            }
+            else if (action == "Remove profile(s)")
+            {
+                var removable = profileList
+                    .Where(p => !p.Name.Equals("default", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (removable.Count == 0)
+                {
+                    AnsiConsole.MarkupLine("[yellow]No removable profiles found.[/]");
+                    return 0;
+                }
+
+                var removePrompt = new MultiSelectionPrompt<string>()
+                    .Title("Select profile(s) to [bold red]remove[/]:")
+                    .NotRequired()
+                    .InstructionsText("[grey](Press [blue]<space>[/] to toggle, [green]<enter>[/] to confirm)[/]");
+
+                foreach (var p in removable)
+                {
+                    removePrompt.AddChoice(p.Name);
+                }
+
+                var targets = AnsiConsole.Prompt(removePrompt);
+                if (targets.Count == 0)
+                {
+                    AnsiConsole.MarkupLine("[yellow]No profiles selected.[/]");
+                    return 0;
+                }
+
+                var result = ConfigManager.RemoveProfiles(targets);
+                if (!result.Ok)
+                {
+                    AnsiConsole.MarkupLine("[red]Failed to remove profiles.[/]");
+                    return 1;
+                }
+
+                AnsiConsole.MarkupLine($"[green]Removed {result.Removed} profile(s).[/]");
             }
         }
 

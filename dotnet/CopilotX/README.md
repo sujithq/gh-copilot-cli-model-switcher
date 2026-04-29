@@ -45,7 +45,10 @@ copilotx list
 
 Shows all configured profiles in a formatted table. The last used profile is marked with `*`.
 
-After displaying the table you are prompted to enter a profile number to launch it directly in interactive mode. Press Enter to exit without launching.
+After displaying the table you can choose an action in one flow:
+- `Use` to launch a profile interactively
+- `Remove` to multi-select and delete profiles
+- `Exit` to leave without changes
 
 ### Use a specific profile
 
