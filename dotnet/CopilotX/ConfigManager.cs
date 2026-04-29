@@ -271,6 +271,11 @@ public class ConfigManager
         return (value ?? string.Empty).Trim().ToLowerInvariant();
     }
 
+    private static string NormalizeCaseSensitive(string? value)
+    {
+        return (value ?? string.Empty).Trim();
+    }
+
     private static List<string> NormalizeMcpServers(Profile profile)
     {
         return (profile.McpCompatServers ?? new List<string>())
@@ -288,8 +293,8 @@ public class ConfigManager
             type = Normalize(profile.Type),
             model = Normalize(profile.Model),
             baseUrl = Normalize(profile.BaseUrl),
-            apiKeyEnv = Normalize(profile.ApiKeyEnv),
-            apiKey = Normalize(profile.ApiKey),
+            apiKeyEnv = NormalizeCaseSensitive(profile.ApiKeyEnv),
+            apiKey = NormalizeCaseSensitive(profile.ApiKey),
             providerType = Normalize(profile.ProviderType),
             azureCliToken = Normalize(profile.AzureCliToken),
             tokenScope = Normalize(profile.TokenScope),
