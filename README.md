@@ -97,7 +97,7 @@ copilotx last
 # Use default Copilot
 copilotx default
 
-# Import profiles from Foundry/Azure OpenAI deployments
+# Import profiles from Foundry / Azure OpenAI / Azure AI Services deployments
 copilotx import-foundry --mode each
 
 # Import all discovered deployments from all applicable accounts

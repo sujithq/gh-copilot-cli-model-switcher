@@ -55,6 +55,11 @@ public class ConfigManager
         return Environment.GetEnvironmentVariable("COPILOTX_CONFIG_DIR") ?? DefaultConfigDir;
     }
 
+    private static string GetAzureCliCommand()
+    {
+        return OperatingSystem.IsWindows() ? "az.cmd" : "az";
+    }
+
     private static string SanitizeSegment(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -76,7 +81,7 @@ public class ConfigManager
         {
             var startInfo = new ProcessStartInfo
             {
-                FileName = "az",
+                FileName = GetAzureCliCommand(),
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = false

@@ -113,6 +113,16 @@ public class ConfigManagerTests : IDisposable
     }
 
     [Fact]
+    public void IsApplicableAccount_AcceptsAiServicesWithFlattenedEndpoint()
+    {
+        using var doc = JsonDocument.Parse("{\"name\":\"myfoundry\",\"kind\":\"AIServices\",\"endpoint\":\"https://myfoundry.cognitiveservices.azure.com/\"}");
+
+        var result = FoundryImportHelpers.IsApplicableAccount(doc.RootElement);
+
+        Assert.True(result);
+    }
+
+    [Fact]
     public void BuildUniqueProfileName_AppendsSuffix_WhenNameAlreadyExists()
     {
         var result = FoundryImportHelpers.BuildUniqueProfileName(

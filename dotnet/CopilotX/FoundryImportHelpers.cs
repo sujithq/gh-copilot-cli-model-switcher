@@ -7,15 +7,19 @@ internal static class FoundryImportHelpers
     internal static bool IsApplicableAccount(JsonElement item)
     {
         var kind = item.TryGetProperty("kind", out var kindProp) ? kindProp.GetString() ?? string.Empty : string.Empty;
-        var endpoint = string.Empty;
+        var endpoint = item.TryGetProperty("endpoint", out var flatEndpointProp) ? flatEndpointProp.GetString() ?? string.Empty : string.Empty;
 
-        if (item.TryGetProperty("properties", out var props) && props.TryGetProperty("endpoint", out var endpointProp))
+        if (string.IsNullOrWhiteSpace(endpoint)
+            && item.TryGetProperty("properties", out var props)
+            && props.TryGetProperty("endpoint", out var endpointProp))
         {
             endpoint = endpointProp.GetString() ?? string.Empty;
         }
 
         return endpoint.Contains(".openai.azure.com", StringComparison.OrdinalIgnoreCase)
-            || kind.Contains("openai", StringComparison.OrdinalIgnoreCase);
+            || endpoint.Contains(".cognitiveservices.azure.com", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("openai", StringComparison.OrdinalIgnoreCase)
+            || kind.Equals("AIServices", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static FoundryDeployment MapDeployment(JsonElement item)
