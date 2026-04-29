@@ -47,6 +47,12 @@ function isAzureProfile(profile) {
   return baseUrl.includes('.openai.azure.com') || providerType === 'azure';
 }
 
+function getAzureDeploymentFromBaseUrl(baseUrl) {
+  const value = baseUrl || '';
+  const m = value.match(/\/openai\/deployments\/([^/?#]+)/i);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
 function shouldUseAzureCliToken(profile, hasApiKey) {
   const mode = (profile.azureCliToken || 'auto').toLowerCase();
 
@@ -117,7 +123,16 @@ async function setEnvironmentForProfile(profile) {
     }
 
     if (profile.model) {
-      process.env.COPILOT_MODEL = profile.model;
+      let modelForProvider = profile.model;
+      if (isAzureProfile(profile)) {
+        const deploymentName = getAzureDeploymentFromBaseUrl(profile.baseUrl);
+        if (deploymentName && modelForProvider.toLowerCase() !== deploymentName.toLowerCase()) {
+          // Azure BYOK providers expect the deployment identifier as COPILOT_MODEL.
+          modelForProvider = deploymentName;
+          console.log(`Using Azure deployment name '${deploymentName}' as model for provider compatibility.`);
+        }
+      }
+      process.env.COPILOT_MODEL = modelForProvider;
     }
 
     let resolvedApiKey = '';

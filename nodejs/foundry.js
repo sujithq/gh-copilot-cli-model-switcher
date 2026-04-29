@@ -51,7 +51,8 @@ function buildImportedProfile(accountName, endpoint, deployment, existingNames) 
     name: profileName,
     type: 'byok',
     baseUrl: `${normalizedEndpoint}/openai/deployments/${deployment.deploymentName}`,
-    model: deployment.modelName,
+    // For Azure OpenAI BYOK, COPILOT_MODEL must match deployment name.
+    model: deployment.deploymentName,
     providerType: 'azure',
     azureCliToken: 'auto',
     tokenScope: 'https://cognitiveservices.azure.com/.default'
