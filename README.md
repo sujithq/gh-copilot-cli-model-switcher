@@ -372,7 +372,7 @@ gh copilot
 
 ```bash
 export COPILOT_PROVIDER_BASE_URL=<azure-openai-deployment-url>
-export COPILOT_PROVIDER_API_KEY=<token from az account get-access-token>
+export COPILOT_PROVIDER_BEARER_TOKEN=<token from az account get-access-token>
 export COPILOT_MODEL=<model>
 gh copilot
 ```
