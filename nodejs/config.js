@@ -132,6 +132,10 @@ function normalizeText(value) {
   return (value || '').trim().toLowerCase();
 }
 
+function normalizeCaseSensitive(value) {
+  return (value || '').trim();
+}
+
 function normalizedMcpServers(profile) {
   const list = Array.isArray(profile && profile.mcpCompatServers)
     ? profile.mcpCompatServers
@@ -145,8 +149,8 @@ function buildProfileSettingsKey(profile) {
     type: normalizeText(profile.type),
     model: normalizeText(profile.model),
     baseUrl: normalizeText(profile.baseUrl),
-    apiKeyEnv: normalizeText(profile.apiKeyEnv),
-    apiKey: normalizeText(profile.apiKey),
+    apiKeyEnv: normalizeCaseSensitive(profile.apiKeyEnv),
+    apiKey: normalizeCaseSensitive(profile.apiKey),
     providerType: normalizeText(profile.providerType),
     azureCliToken: normalizeText(profile.azureCliToken),
     tokenScope: normalizeText(profile.tokenScope),
