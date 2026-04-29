@@ -1,6 +1,7 @@
 using Spectre.Console;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 
 namespace CopilotX;
 
@@ -24,6 +25,7 @@ class Program
             "last" => LastCommand(remainingArgs),
             "default" => DefaultCommand(remainingArgs),
             "add" => AddCommand(),
+            "import-foundry" => ImportFoundryCommand(remainingArgs).GetAwaiter().GetResult(),
             "help" or "--help" or "-h" => ShowHelp(),
             _ => ShowHelp()
         };
@@ -47,6 +49,7 @@ class Program
         table.AddRow("[cyan]last [[args...]][/]", "Use the last used profile and run gh copilot");
         table.AddRow("[cyan]default [[args...]][/]", "Use the default Copilot profile");
         table.AddRow("[cyan]add[/]", "Add or update a profile interactively");
+        table.AddRow("[cyan]import-foundry[/]", "Import profiles from Foundry/Azure OpenAI deployments");
         table.AddRow("[cyan]help[/]", "Show this help message");
 
         AnsiConsole.Write(table);
@@ -56,6 +59,7 @@ class Program
         AnsiConsole.MarkupLine("  copilotx use azure-gpt suggest \"create a function\"");
         AnsiConsole.MarkupLine("  copilotx last");
         AnsiConsole.MarkupLine("  copilotx add");
+        AnsiConsole.MarkupLine("  copilotx import-foundry --mode each");
 
         return 0;
     }
@@ -474,6 +478,328 @@ class Program
         return 0;
     }
 
+    static Dictionary<string, string> ParseOptions(string[] args)
+    {
+        var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (!arg.StartsWith("--", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var key = arg.Substring(2);
+            var value = "true";
+
+            if (i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                value = args[i + 1];
+                i += 1;
+            }
+
+            options[key] = value;
+        }
+
+        return options;
+    }
+
+    static string SanitizeProfilePart(string value)
+    {
+        var chars = value
+            .ToLowerInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) || ch == '-' ? ch : '-')
+            .ToArray();
+
+        var normalized = new string(chars);
+        while (normalized.Contains("--", StringComparison.Ordinal))
+        {
+            normalized = normalized.Replace("--", "-", StringComparison.Ordinal);
+        }
+
+        return normalized.Trim('-');
+    }
+
+    static async Task<JsonDocument> RunAzJson(params string[] azArgs)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "az",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        foreach (var arg in azArgs)
+        {
+            startInfo.ArgumentList.Add(arg);
+        }
+
+        var process = Process.Start(startInfo);
+        if (process == null)
+        {
+            throw new InvalidOperationException("Failed to start az CLI process.");
+        }
+
+        var stdout = await process.StandardOutput.ReadToEndAsync();
+        var stderr = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"az {string.Join(" ", azArgs)} failed (exit {process.ExitCode}): {stderr.Trim()}");
+        }
+
+        try
+        {
+            return JsonDocument.Parse(string.IsNullOrWhiteSpace(stdout) ? "[]" : stdout);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to parse az output: {ex.Message}");
+        }
+    }
+
+    static async Task<List<FoundryAccount>> ListFoundryAccounts(string subscription)
+    {
+        JsonDocument doc;
+        if (string.IsNullOrWhiteSpace(subscription))
+        {
+            doc = await RunAzJson("cognitiveservices", "account", "list", "-o", "json");
+        }
+        else
+        {
+            doc = await RunAzJson("cognitiveservices", "account", "list", "--subscription", subscription, "-o", "json");
+        }
+
+        using (doc)
+        {
+            var result = new List<FoundryAccount>();
+            foreach (var item in doc.RootElement.EnumerateArray())
+            {
+                var name = item.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? string.Empty : string.Empty;
+                var resourceGroup = item.TryGetProperty("resourceGroup", out var rgProp) ? rgProp.GetString() ?? string.Empty : string.Empty;
+                var kind = item.TryGetProperty("kind", out var kindProp) ? kindProp.GetString() ?? string.Empty : string.Empty;
+
+                var endpoint = string.Empty;
+                if (item.TryGetProperty("properties", out var props) && props.TryGetProperty("endpoint", out var endpointProp))
+                {
+                    endpoint = endpointProp.GetString() ?? string.Empty;
+                }
+
+                if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(resourceGroup))
+                {
+                    continue;
+                }
+
+                var endpointLower = endpoint.ToLowerInvariant();
+                var kindLower = kind.ToLowerInvariant();
+                if (!endpointLower.Contains(".openai.azure.com", StringComparison.Ordinal)
+                    && !kindLower.Contains("openai", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                result.Add(new FoundryAccount
+                {
+                    Name = name,
+                    ResourceGroup = resourceGroup,
+                    Endpoint = endpoint
+                });
+            }
+
+            return result;
+        }
+    }
+
+    static async Task<List<FoundryDeployment>> ListAccountDeployments(string accountName, string resourceGroup, string subscription)
+    {
+        JsonDocument doc;
+        if (string.IsNullOrWhiteSpace(subscription))
+        {
+            doc = await RunAzJson(
+                "cognitiveservices", "account", "deployment", "list",
+                "--name", accountName,
+                "--resource-group", resourceGroup,
+                "-o", "json");
+        }
+        else
+        {
+            doc = await RunAzJson(
+                "cognitiveservices", "account", "deployment", "list",
+                "--name", accountName,
+                "--resource-group", resourceGroup,
+                "--subscription", subscription,
+                "-o", "json");
+        }
+
+        using (doc)
+        {
+            var result = new List<FoundryDeployment>();
+            foreach (var item in doc.RootElement.EnumerateArray())
+            {
+                var deploymentName = item.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? string.Empty : string.Empty;
+                var modelName = deploymentName;
+                var modelVersion = string.Empty;
+
+                if (item.TryGetProperty("properties", out var properties)
+                    && properties.TryGetProperty("model", out var model))
+                {
+                    if (model.TryGetProperty("name", out var modelNameProp))
+                    {
+                        modelName = modelNameProp.GetString() ?? modelName;
+                    }
+
+                    if (model.TryGetProperty("version", out var modelVersionProp))
+                    {
+                        modelVersion = modelVersionProp.GetString() ?? string.Empty;
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(deploymentName))
+                {
+                    result.Add(new FoundryDeployment
+                    {
+                        DeploymentName = deploymentName,
+                        ModelName = modelName,
+                        ModelVersion = modelVersion
+                    });
+                }
+            }
+
+            return result;
+        }
+    }
+
+    static async Task<int> ImportFoundryCommand(string[] args)
+    {
+        var options = ParseOptions(args);
+        options.TryGetValue("account", out var account);
+        options.TryGetValue("resource-group", out var resourceGroup);
+        options.TryGetValue("subscription", out var subscription);
+        options.TryGetValue("mode", out var mode);
+
+        var addAll = options.ContainsKey("all");
+        var effectiveMode = addAll ? "all" : (mode ?? string.Empty).Trim().ToLowerInvariant();
+        if (effectiveMode != "all" && effectiveMode != "each")
+        {
+            effectiveMode = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Import mode:")
+                    .AddChoices(new[] { "each", "all" }));
+        }
+
+        try
+        {
+            List<FoundryAccount> accounts;
+            if (!string.IsNullOrWhiteSpace(account) && !string.IsNullOrWhiteSpace(resourceGroup))
+            {
+                accounts = new List<FoundryAccount>
+                {
+                    new FoundryAccount
+                    {
+                        Name = account,
+                        ResourceGroup = resourceGroup,
+                        Endpoint = $"https://{account}.openai.azure.com"
+                    }
+                };
+            }
+            else
+            {
+                accounts = await ListFoundryAccounts(subscription ?? string.Empty);
+            }
+
+            if (accounts.Count == 0)
+            {
+                AnsiConsole.MarkupLine("[yellow]No OpenAI/Foundry accounts found.[/]");
+                return 0;
+            }
+
+            var imported = 0;
+            var scanned = 0;
+
+            foreach (var foundryAccount in accounts)
+            {
+                List<FoundryDeployment> deployments;
+                try
+                {
+                    deployments = await ListAccountDeployments(
+                        foundryAccount.Name,
+                        foundryAccount.ResourceGroup,
+                        subscription ?? string.Empty);
+                }
+                catch (Exception ex)
+                {
+                    AnsiConsole.MarkupLine($"[yellow]Skipping {foundryAccount.Name}: {ex.Message}[/]");
+                    continue;
+                }
+
+                if (deployments.Count == 0)
+                {
+                    continue;
+                }
+
+                AnsiConsole.MarkupLine($"\n[bold]Account:[/] {foundryAccount.Name} ([dim]{foundryAccount.ResourceGroup}[/])");
+                var endpoint = (string.IsNullOrWhiteSpace(foundryAccount.Endpoint)
+                    ? $"https://{foundryAccount.Name}.openai.azure.com"
+                    : foundryAccount.Endpoint).TrimEnd('/');
+
+                foreach (var deployment in deployments)
+                {
+                    scanned += 1;
+                    var shouldAdd = effectiveMode == "all";
+                    var modelLabel = string.IsNullOrWhiteSpace(deployment.ModelVersion)
+                        ? deployment.ModelName
+                        : $"{deployment.ModelName}:{deployment.ModelVersion}";
+
+                    if (!shouldAdd)
+                    {
+                        shouldAdd = AnsiConsole.Confirm(
+                            $"Add deployment '{deployment.DeploymentName}' ({modelLabel}) as profile?",
+                            false);
+                    }
+
+                    if (!shouldAdd)
+                    {
+                        continue;
+                    }
+
+                    var profileName = $"foundry-{SanitizeProfilePart(foundryAccount.Name)}-{SanitizeProfilePart(deployment.DeploymentName)}";
+                    var profile = new Profile
+                    {
+                        Name = profileName,
+                        Type = "byok",
+                        BaseUrl = $"{endpoint}/openai/deployments/{deployment.DeploymentName}",
+                        Model = deployment.ModelName,
+                        ProviderType = "azure",
+                        AzureCliToken = "auto",
+                        TokenScope = "https://cognitiveservices.azure.com/.default"
+                    };
+
+                    if (ConfigManager.AddProfile(profile))
+                    {
+                        imported += 1;
+                        AnsiConsole.MarkupLine($"  [green]Added[/] {profileName}");
+                    }
+                    else
+                    {
+                        AnsiConsole.MarkupLine($"  [red]Failed[/] {profileName}");
+                    }
+                }
+            }
+
+            AnsiConsole.MarkupLine($"\n[green]Imported {imported} profile(s) from {scanned} deployment(s).[/]");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Error importing Foundry profiles: {ex.Message}[/]");
+            AnsiConsole.MarkupLine("[dim]Ensure Azure CLI is installed and authenticated: az login[/]");
+            return 1;
+        }
+    }
+
     class AuthEnvironmentResult
     {
         public bool UsedAzureCliToken { get; set; }
@@ -483,5 +809,19 @@ class Program
     {
         public int ExitCode { get; set; }
         public string Output { get; set; } = string.Empty;
+    }
+
+    class FoundryAccount
+    {
+        public string Name { get; set; } = string.Empty;
+        public string ResourceGroup { get; set; } = string.Empty;
+        public string Endpoint { get; set; } = string.Empty;
+    }
+
+    class FoundryDeployment
+    {
+        public string DeploymentName { get; set; } = string.Empty;
+        public string ModelName { get; set; } = string.Empty;
+        public string ModelVersion { get; set; } = string.Empty;
     }
 }
