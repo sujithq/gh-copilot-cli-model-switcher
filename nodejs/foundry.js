@@ -42,7 +42,7 @@ function isChatCapableDeployment(item) {
     || (item && item.name)
     || '').toLowerCase();
 
-  return !modelName.includes('embedding');
+  return !modelName.includes('embed');
 }
 
 function buildUniqueProfileName(accountName, deploymentName, existingNames) {
