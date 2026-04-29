@@ -2,6 +2,7 @@ using Spectre.Console;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace CopilotX;
 
@@ -333,16 +334,109 @@ class Program
         return args.ToArray();
     }
 
+    static List<string> DiscoverMcpServers()
+    {
+        var discovered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Strategy 1: VS Code user settings.json / mcp.json
+        foreach (var settingsPath in GetVsCodeSettingsPaths())
+        {
+            try
+            {
+                if (!File.Exists(settingsPath)) continue;
+                using var stream = File.OpenRead(settingsPath);
+                var doc = JsonDocument.Parse(stream);
+                // settings.json: { "mcp": { "servers": { ... } } }
+                // mcp.json:      { "servers": { ... } }
+                JsonElement servers = default;
+                if (doc.RootElement.TryGetProperty("mcp", out var mcp)
+                    && mcp.TryGetProperty("servers", out servers))
+                { /* servers already set */ }
+                else
+                {
+                    doc.RootElement.TryGetProperty("servers", out servers);
+                }
+                if (servers.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var prop in servers.EnumerateObject())
+                        discovered.Add(prop.Name);
+                }
+            }
+            catch { /* ignore read/parse errors */ }
+        }
+
+        // Strategy 2: gh config list — look for copilot.mcp* entries
+        try
+        {
+            var psi = new ProcessStartInfo("gh", "config list")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var proc = Process.Start(psi);
+            if (proc != null)
+            {
+                var output = proc.StandardOutput.ReadToEnd();
+                proc.WaitForExit(5000);
+                foreach (var line in output.Split('\n'))
+                {
+                    var m = Regex.Match(line.Trim(),
+                        @"^copilot\.mcp[_-]?servers?\.([^.\s]+)",
+                        RegexOptions.IgnoreCase);
+                    if (m.Success) discovered.Add(m.Groups[1].Value);
+                }
+            }
+        }
+        catch { /* gh not found or error */ }
+
+        return [.. discovered];
+    }
+
+    static IEnumerable<string> GetVsCodeSettingsPaths()
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (OperatingSystem.IsWindows())
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            yield return Path.Combine(appData, "Code", "User", "settings.json");
+            yield return Path.Combine(appData, "Code", "User", "mcp.json");
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            var base2 = Path.Combine(home, "Library", "Application Support", "Code", "User");
+            yield return Path.Combine(base2, "settings.json");
+            yield return Path.Combine(base2, "mcp.json");
+        }
+        else
+        {
+            var base2 = Path.Combine(home, ".config", "Code", "User");
+            yield return Path.Combine(base2, "settings.json");
+            yield return Path.Combine(base2, "mcp.json");
+        }
+    }
+
     static List<string> PromptMcpCompatServers(List<string>? previousSelection)
     {
-        var previous = previousSelection ?? new List<string>(DefaultMcpCompatServers);
+        var discovered = DiscoverMcpServers();
+        var candidates = discovered.Count > 0 ? discovered : new List<string>(DefaultMcpCompatServers);
+        var isDiscovered = discovered.Count > 0;
+
+        // Default selection: all candidates (disable everything for maximum compat)
+        var previous = previousSelection ?? candidates;
+
+        if (isDiscovered)
+            AnsiConsole.MarkupLine($"[dim]Discovered {candidates.Count} configured MCP server(s).[/]");
+        else
+            AnsiConsole.MarkupLine("[dim]Could not auto-discover MCP servers. Using known candidates as fallback.[/]");
 
         var prompt = new MultiSelectionPrompt<string>()
             .Title("Select MCP servers to [bold]disable[/] for Azure BYOK compat mode:")
             .NotRequired()
             .InstructionsText("[grey](Press [blue]<space>[/] to toggle, [green]<enter>[/] to confirm)[/]");
 
-        foreach (var server in DefaultMcpCompatServers)
+        foreach (var server in candidates)
         {
             var choice = prompt.AddChoice(server);
             if (previous.Contains(server, StringComparer.OrdinalIgnoreCase))

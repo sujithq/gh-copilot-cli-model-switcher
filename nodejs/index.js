@@ -2,7 +2,10 @@
 
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const readline = require('readline');
 const {
   sanitizeProfilePart,
@@ -155,22 +158,87 @@ async function setEnvironmentForProfile(profile) {
 
 const DEFAULT_MCP_COMPAT_SERVERS = ['foundry-mcp', 'context7', 'msx-mcp', 'azure', 'workiq', 'powerbi-remote'];
 
+function getVsCodeSettingsPaths() {
+  const home = os.homedir();
+  if (process.platform === 'win32') {
+    const appData = process.env.APPDATA || home;
+    return [
+      path.join(appData, 'Code', 'User', 'settings.json'),
+      path.join(appData, 'Code', 'User', 'mcp.json'),
+    ];
+  } else if (process.platform === 'darwin') {
+    const base = path.join(home, 'Library', 'Application Support', 'Code', 'User');
+    return [path.join(base, 'settings.json'), path.join(base, 'mcp.json')];
+  } else {
+    const base = path.join(home, '.config', 'Code', 'User');
+    return [path.join(base, 'settings.json'), path.join(base, 'mcp.json')];
+  }
+}
+
+function discoverMcpServers() {
+  const discovered = new Set();
+
+  // Strategy 1: VS Code user settings.json / mcp.json
+  try {
+    for (const p of getVsCodeSettingsPaths()) {
+      if (fs.existsSync(p)) {
+        const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+        // settings.json: "mcp": { "servers": { "name": {...} } }
+        // mcp.json:      { "servers": { "name": {...} } }
+        const servers = (data && data.mcp && data.mcp.servers)
+          || (data && data.servers)
+          || {};
+        Object.keys(servers).forEach((name) => discovered.add(name));
+      }
+    }
+  } catch { /* ignore read/parse errors */ }
+
+  // Strategy 2: gh config list — look for copilot.mcp* entries
+  try {
+    const r = spawnSync('gh', ['config', 'list'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 5000
+    });
+    if (r.status === 0 && r.stdout) {
+      for (const line of r.stdout.split('\n')) {
+        // e.g. "copilot.mcp_servers.foundry-mcp.url = ..."
+        const m = line.trim().match(/^copilot\.mcp[_-]?servers?\.([^.\s]+)/i);
+        if (m) discovered.add(m[1]);
+      }
+    }
+  } catch { /* gh not found or error */ }
+
+  return [...discovered];
+}
+
 function isTokenFailure(text) {
   return /(401|unauthorized|forbidden|invalid token|token expired|expired token|authentication failed|permission denied)/i.test(text || '');
 }
 
 async function promptMcpCompatServers(previousSelection) {
-  const servers = DEFAULT_MCP_COMPAT_SERVERS;
-  const prev = previousSelection ?? servers;
-  const prevLabel = prev.length === servers.length
+  const discovered = discoverMcpServers();
+  const candidates = discovered.length > 0 ? discovered : DEFAULT_MCP_COMPAT_SERVERS;
+  const isDiscovered = discovered.length > 0;
+
+  // Default selection: all candidates (disable everything for maximum compat)
+  const prev = previousSelection ?? candidates;
+  const prevLabel = prev.length === candidates.length
     ? 'all'
     : prev.length === 0
       ? 'none'
       : prev.join(', ');
 
   console.log('\nSelect MCP servers to disable for Azure BYOK compat mode.');
-  console.log('Known servers:');
-  servers.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
+  if (isDiscovered) {
+    console.log(`Discovered ${candidates.length} configured MCP server(s):`);
+  } else {
+    console.log('Could not auto-discover MCP servers. Using known candidates:');
+  }
+  candidates.forEach((s, i) => {
+    const checked = prev.includes(s) ? 'x' : ' ';
+    console.log(`  ${i + 1}. [${checked}] ${s}`);
+  });
   console.log(`\nEnter numbers to disable (space/comma-separated), 'all', or 'none'.`);
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -179,12 +247,12 @@ async function promptMcpCompatServers(previousSelection) {
   });
 
   if (!answer) return prev;
-  if (answer.toLowerCase() === 'all') return [...servers];
+  if (answer.toLowerCase() === 'all') return [...candidates];
   if (answer.toLowerCase() === 'none') return [];
 
-  const nums = answer.split(/[\s,]+/).map((n) => parseInt(n, 10)).filter((n) => !isNaN(n) && n >= 1 && n <= servers.length);
+  const nums = answer.split(/[\s,]+/).map((n) => parseInt(n, 10)).filter((n) => !isNaN(n) && n >= 1 && n <= candidates.length);
   if (nums.length === 0) return prev;
-  return nums.map((n) => servers[n - 1]);
+  return nums.map((n) => candidates[n - 1]);
 }
 
 function buildCopilotArgs(profile, copilotArgs = []) {
