@@ -99,7 +99,7 @@ internal static class FoundryImportHelpers
             modelName = deploymentNameProp.GetString() ?? string.Empty;
         }
 
-        return !modelName.Contains("embedding", StringComparison.OrdinalIgnoreCase);
+        return !modelName.Contains("embed", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static string BuildUniqueProfileName(string accountName, string deploymentName, IEnumerable<string> existingNames)
