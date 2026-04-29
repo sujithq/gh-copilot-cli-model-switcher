@@ -112,6 +112,54 @@ test('addProfile inserts and updates by name', (t) => {
   assert.equal(matches[0].model, 'gpt-4.1');
 });
 
+test('addProfile does not create duplicates with equivalent settings', (t) => {
+  withIsolatedConfigDir(t);
+
+  const first = {
+    name: 'azure-primary',
+    type: 'byok',
+    model: 'gpt-4.1',
+    baseUrl: 'https://example.openai.azure.com/openai/deployments/gpt-4-1',
+    providerType: 'azure',
+    azureCliToken: 'auto',
+    tokenScope: 'https://cognitiveservices.azure.com/.default',
+    mcpCompatServers: ['azure', 'foundry-mcp']
+  };
+
+  const sameSettingsDifferentName = {
+    name: 'azure-duplicate-name',
+    type: 'byok',
+    model: 'gpt-4.1',
+    baseUrl: 'https://example.openai.azure.com/openai/deployments/gpt-4-1',
+    providerType: 'azure',
+    azureCliToken: 'auto',
+    tokenScope: 'https://cognitiveservices.azure.com/.default',
+    mcpCompatServers: ['foundry-mcp', 'azure']
+  };
+
+  assert.equal(config.addProfile(first), true);
+  assert.equal(config.addProfile(sameSettingsDifferentName), true);
+
+  const profiles = config.listProfiles();
+  const matches = profiles.filter((p) => p.name === 'azure-primary' || p.name === 'azure-duplicate-name');
+
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].name, 'azure-primary');
+});
+
+test('removeProfiles removes multiple and resets lastUsed when needed', (t) => {
+  withIsolatedConfigDir(t);
+
+  config.addProfile({ name: 'p1', type: 'byok', model: 'model-1' });
+  config.addProfile({ name: 'p2', type: 'byok', model: 'model-2' });
+  config.setLastUsed('p2');
+
+  const result = config.removeProfiles(['p1', 'p2']);
+  assert.equal(result.ok, true);
+  assert.equal(result.removed, 2);
+  assert.equal(config.getLastUsed(), 'default');
+});
+
 test('setLastUsed persists across reads', (t) => {
   withIsolatedConfigDir(t);
 

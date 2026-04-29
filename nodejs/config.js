@@ -117,17 +117,99 @@ function getProfile(name) {
   return config.profiles.find(p => p.name === name);
 }
 
-function addProfile(profile) {
-  const config = loadConfig();
+function normalizeText(value) {
+  return (value || '').trim().toLowerCase();
+}
 
-  const existingIndex = config.profiles.findIndex(p => p.name === profile.name);
-  if (existingIndex >= 0) {
-    config.profiles[existingIndex] = profile;
-  } else {
-    config.profiles.push(profile);
+function normalizedMcpServers(profile) {
+  const list = Array.isArray(profile && profile.mcpCompatServers)
+    ? profile.mcpCompatServers
+    : [];
+
+  return [...new Set(list.map((s) => normalizeText(s)).filter(Boolean))].sort();
+}
+
+function buildProfileSettingsKey(profile) {
+  const keyObject = {
+    type: normalizeText(profile.type),
+    model: normalizeText(profile.model),
+    baseUrl: normalizeText(profile.baseUrl),
+    apiKeyEnv: normalizeText(profile.apiKeyEnv),
+    apiKey: normalizeText(profile.apiKey),
+    providerType: normalizeText(profile.providerType),
+    azureCliToken: normalizeText(profile.azureCliToken),
+    tokenScope: normalizeText(profile.tokenScope),
+    mcpCompatServers: normalizedMcpServers(profile)
+  };
+
+  return JSON.stringify(keyObject);
+}
+
+function upsertProfile(profile) {
+  const config = loadConfig();
+  const incomingName = (profile.name || '').trim();
+
+  const byNameIndex = config.profiles.findIndex((p) => p.name === incomingName);
+  if (byNameIndex >= 0) {
+    config.profiles[byNameIndex] = profile;
+    return {
+      ok: saveConfig(config),
+      action: 'updated-by-name',
+      name: incomingName
+    };
   }
 
-  return saveConfig(config);
+  const incomingKey = buildProfileSettingsKey(profile);
+  const equivalentIndex = config.profiles.findIndex((p) => buildProfileSettingsKey(p) === incomingKey);
+
+  if (equivalentIndex >= 0) {
+    const existingName = config.profiles[equivalentIndex].name;
+    config.profiles[equivalentIndex] = { ...profile, name: existingName };
+    return {
+      ok: saveConfig(config),
+      action: 'updated-equivalent',
+      name: existingName
+    };
+  }
+
+  config.profiles.push(profile);
+  return {
+    ok: saveConfig(config),
+    action: 'added',
+    name: incomingName
+  };
+}
+
+function addProfile(profile) {
+  return upsertProfile(profile).ok;
+}
+
+function removeProfiles(names) {
+  const config = loadConfig();
+  const targets = new Set((names || []).map((n) => (n || '').trim().toLowerCase()).filter(Boolean));
+
+  if (!targets.size) {
+    return { ok: true, removed: 0 };
+  }
+
+  const before = config.profiles.length;
+  config.profiles = config.profiles.filter((p) => {
+    if ((p.name || '').toLowerCase() === 'default') {
+      return true;
+    }
+
+    return !targets.has((p.name || '').toLowerCase());
+  });
+
+  const removed = before - config.profiles.length;
+
+  if (removed > 0 && targets.has((config.lastUsed || '').toLowerCase())) {
+    config.lastUsed = config.profiles.some((p) => p.name === 'default')
+      ? 'default'
+      : (config.profiles[0] && config.profiles[0].name) || 'default';
+  }
+
+  return { ok: saveConfig(config), removed };
 }
 
 function listProfiles() {
@@ -154,11 +236,14 @@ module.exports = {
   listProfiles,
   setLastUsed,
   getLastUsed,
+  upsertProfile,
+  removeProfiles,
   CONFIG_FILE: resolveConfigFile,
   getConfigFile: resolveConfigFile,
   __test: {
     sanitizeSegment,
     resolveConfigFileFor,
-    getConfigDir
+    getConfigDir,
+    buildProfileSettingsKey
   }
 };

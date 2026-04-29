@@ -39,6 +39,7 @@ class Program
         return command switch
         {
             "list" => ListCommand(),
+            "remove" => RemoveCommand(remainingArgs),
             "use" => UseCommand(remainingArgs),
             "last" => LastCommand(remainingArgs),
             "default" => DefaultCommand(remainingArgs),
@@ -63,6 +64,7 @@ class Program
         table.AddColumn("Description");
 
         table.AddRow("[cyan]list[/]", "List all available profiles (interactive selection)");
+        table.AddRow("[cyan]remove [[profiles...]][/]", "Remove one or more profiles (interactive multi-select)");
         table.AddRow("[cyan]use <profile> [[args...]][/]", "Switch to a specific profile and run gh copilot");
         table.AddRow("[cyan]last [[args...]][/]", "Use the last used profile and run gh copilot");
         table.AddRow("[cyan]default [[args...]][/]", "Use the default Copilot profile");
@@ -105,6 +107,8 @@ class Program
 
         AnsiConsole.MarkupLine("\n[dim]Examples:[/]");
         AnsiConsole.MarkupLine("  copilotx list");
+        AnsiConsole.MarkupLine("  copilotx remove");
+        AnsiConsole.MarkupLine("  copilotx remove azure-gpt ollama-local");
         AnsiConsole.MarkupLine("  copilotx use azure-gpt");
         AnsiConsole.MarkupLine("  copilotx use azure-gpt suggest \"create a function\"");
         AnsiConsole.MarkupLine("  copilotx use azure-gpt -p \"fix the failing tests\"");
@@ -180,6 +184,56 @@ class Program
             }
         }
 
+        return 0;
+    }
+
+    static int RemoveCommand(string[] args)
+    {
+        List<string> targets;
+
+        if (args.Length > 0)
+        {
+            targets = args.Where(a => !string.IsNullOrWhiteSpace(a)).ToList();
+        }
+        else
+        {
+            var removableProfiles = ConfigManager.ListProfiles()
+                .Where(p => !p.Name.Equals("default", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (removableProfiles.Count == 0)
+            {
+                AnsiConsole.MarkupLine("[yellow]No removable profiles found.[/]");
+                return 0;
+            }
+
+            var prompt = new MultiSelectionPrompt<string>()
+                .Title("Select profile(s) to [bold red]remove[/]:")
+                .NotRequired()
+                .InstructionsText("[grey](Press [blue]<space>[/] to toggle, [green]<enter>[/] to confirm)[/]");
+
+            foreach (var profile in removableProfiles)
+            {
+                prompt.AddChoice(profile.Name);
+            }
+
+            targets = AnsiConsole.Prompt(prompt);
+        }
+
+        if (targets.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[yellow]No profiles selected.[/]");
+            return 0;
+        }
+
+        var result = ConfigManager.RemoveProfiles(targets);
+        if (!result.Ok)
+        {
+            AnsiConsole.MarkupLine("[red]Failed to remove profiles.[/]");
+            return 1;
+        }
+
+        AnsiConsole.MarkupLine($"[green]Removed {result.Removed} profile(s).[/]");
         return 0;
     }
 
@@ -845,14 +899,24 @@ class Program
             }
         }
 
-        if (ConfigManager.AddProfile(profile))
-        {
-            AnsiConsole.MarkupLine($"[green]✓[/] Profile '{name}' added successfully!");
-        }
-        else
+        var upsert = ConfigManager.UpsertProfile(profile);
+        if (!upsert.Ok)
         {
             AnsiConsole.MarkupLine("[red]Error: Failed to add profile[/]");
             return 1;
+        }
+
+        if (upsert.Action == "added")
+        {
+            AnsiConsole.MarkupLine($"[green]✓[/] Profile '{EscapeMarkup(upsert.Name)}' added successfully!");
+        }
+        else if (upsert.Action == "updated-equivalent")
+        {
+            AnsiConsole.MarkupLine($"[yellow]Equivalent profile already existed; updated '{EscapeMarkup(upsert.Name)}' instead of creating a duplicate.[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[green]✓[/] Profile '{EscapeMarkup(upsert.Name)}' updated successfully!");
         }
 
         return 0;
@@ -1145,15 +1209,26 @@ class Program
                     var profile = FoundryImportHelpers.BuildImportedProfile(foundryAccount.Name, endpoint, deployment, existingNames);
                     var profileName = profile.Name;
 
-                    if (ConfigManager.AddProfile(profile))
+                    var upsert = ConfigManager.UpsertProfile(profile);
+                    if (!upsert.Ok)
+                    {
+                        AnsiConsole.MarkupLine($"  [red]Failed[/] {EscapeMarkup(profileName)}");
+                        continue;
+                    }
+
+                    existingNames.Add(upsert.Name);
+                    if (upsert.Action == "added")
                     {
                         imported += 1;
-                        existingNames.Add(profileName);
-                        AnsiConsole.MarkupLine($"  [green]Added[/] {EscapeMarkup(profileName)}");
+                        AnsiConsole.MarkupLine($"  [green]Added[/] {EscapeMarkup(upsert.Name)}");
+                    }
+                    else if (upsert.Action == "updated-equivalent")
+                    {
+                        AnsiConsole.MarkupLine($"  [yellow]Reused existing equivalent profile[/] {EscapeMarkup(upsert.Name)}");
                     }
                     else
                     {
-                        AnsiConsole.MarkupLine($"  [red]Failed[/] {EscapeMarkup(profileName)}");
+                        AnsiConsole.MarkupLine($"  [green]Updated[/] {EscapeMarkup(upsert.Name)}");
                     }
                 }
             }

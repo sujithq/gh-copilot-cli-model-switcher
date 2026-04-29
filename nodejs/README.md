@@ -114,6 +114,26 @@ copilotx add
 
 Interactive wizard to add or update a profile.
 
+If a profile with equivalent settings already exists (same provider/model/base URL/auth/token/MCP settings), CopilotX updates the existing profile instead of creating a duplicate.
+
+### Remove profiles (multi-select)
+
+```bash
+copilotx remove [profile1 profile2 ...]
+```
+
+- Run without names for interactive multi-select removal.
+- Pass names to remove multiple in one command.
+- `default` is protected and is not removed.
+
+```bash
+# Interactive multi-select
+copilotx remove
+
+# Remove two by name
+copilotx remove azure-gpt ollama-local
+```
+
 ### Import profiles from Foundry deployments
 
 ```bash
@@ -121,6 +141,8 @@ copilotx import-foundry [options]
 ```
 
 Discovers Azure OpenAI / Foundry accounts and deployments via Azure CLI and creates CopilotX profiles.
+
+On re-import, equivalent profiles are deduplicated automatically.
 
 **Options:**
 
