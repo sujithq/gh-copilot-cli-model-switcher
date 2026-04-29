@@ -494,12 +494,12 @@ class Program
 
         if (profile == null)
         {
-            AnsiConsole.MarkupLine($"[red]Error: Profile '{profileName}' not found[/]");
+            AnsiConsole.MarkupLine($"[red]Error: Profile '{Markup.Escape(profileName)}' not found[/]");
             AnsiConsole.MarkupLine("Use 'gh-copilot-byok list' to see available profiles.");
             return 1;
         }
 
-        AnsiConsole.MarkupLine($"[green]Using profile:[/] {profile.Name} ([dim]{profile.Type}[/])");
+        AnsiConsole.MarkupLine($"[green]Using profile:[/] {Markup.Escape(profile.Name)} ([dim]{Markup.Escape(profile.Type)}[/])");
 
         AuthEnvironmentResult envInfo;
         try
