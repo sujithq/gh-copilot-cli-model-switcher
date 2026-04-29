@@ -40,6 +40,7 @@ class Program
         {
             "list" => ListCommand(),
             "manage" => ManageCommand(),
+            "mcp-compat" => McpCompatCommand(remainingArgs),
             "remove" => RemoveCommand(remainingArgs),
             "use" => UseCommand(remainingArgs),
             "last" => LastCommand(remainingArgs),
@@ -54,7 +55,7 @@ class Program
     static int ShowHelp()
     {
         AnsiConsole.Write(
-            new FigletText("CopilotX")
+            new FigletText("gh-copilot-byok")
                 .LeftJustified()
                 .Color(Color.Blue));
 
@@ -65,7 +66,8 @@ class Program
         table.AddColumn("Description");
 
         table.AddRow("[cyan]list[/]", "List all available profiles (read-only)");
-        table.AddRow("[cyan]manage[/]", "Interactive profile management (Use/Remove/Add/Import)");
+        table.AddRow("[cyan]manage[/]", "Interactive profile management (Use/Remove/Add/Import/MCP)");
+        table.AddRow("[cyan]mcp-compat <profile> [[--action set|reset|all|none]][/]", "Set or reset MCP compatibility servers for an Azure BYOK/proxy profile");
         table.AddRow("[cyan]remove [[profiles...]][/]", "Remove one or more profiles (interactive multi-select)");
         table.AddRow("[cyan]use <profile> [[args...]][/]", "Switch to a specific profile and run gh copilot");
         table.AddRow("[cyan]last [[args...]][/]", "Use the last used profile and run gh copilot");
@@ -105,24 +107,25 @@ class Program
         AnsiConsole.MarkupLine("  disable (to avoid provider tool-count limits). The selection is saved as [cyan]mcpCompatServers[/] on the");
         AnsiConsole.MarkupLine("  profile and reused on every subsequent run. Remove the field from config to re-prompt.");
         AnsiConsole.MarkupLine("  Default candidates: [dim]foundry-mcp, context7, msx-mcp, azure, workiq, powerbi-remote[/]");
-        AnsiConsole.MarkupLine("  Set [cyan]COPILOTX_DISABLE_MCP_COMPAT=off[/] to skip compat mode entirely.");
+        AnsiConsole.MarkupLine("  Set [cyan]GH_COPILOT_BYOK_DISABLE_MCP_COMPAT=off[/] to skip compat mode entirely.");
 
         AnsiConsole.MarkupLine("\n[dim]Examples:[/]");
-        AnsiConsole.MarkupLine("  copilotx list");
-        AnsiConsole.MarkupLine("  copilotx manage");
-        AnsiConsole.MarkupLine("  copilotx remove");
-        AnsiConsole.MarkupLine("  copilotx remove azure-gpt ollama-local");
-        AnsiConsole.MarkupLine("  copilotx use azure-gpt");
-        AnsiConsole.MarkupLine("  copilotx use azure-gpt suggest \"create a function\"");
-        AnsiConsole.MarkupLine("  copilotx use azure-gpt -p \"fix the failing tests\"");
-        AnsiConsole.MarkupLine("  copilotx use azure-gpt -p \"refactor this\" --allow-tool=write");
-        AnsiConsole.MarkupLine("  copilotx last -p \"explain this code\"");
-        AnsiConsole.MarkupLine("  copilotx default");
-        AnsiConsole.MarkupLine("  copilotx add");
-        AnsiConsole.MarkupLine("  copilotx import-foundry");
-        AnsiConsole.MarkupLine("  copilotx import-foundry --all");
-        AnsiConsole.MarkupLine("  copilotx import-foundry --account myfoundry --resource-group my-rg --all");
-        AnsiConsole.MarkupLine("  copilotx import-foundry --subscription 00000000-0000-0000-0000-000000000000 --all");
+        AnsiConsole.MarkupLine("  gh-copilot-byok list");
+        AnsiConsole.MarkupLine("  gh-copilot-byok manage");
+        AnsiConsole.MarkupLine("  gh-copilot-byok mcp-compat azure-gpt --action reset");
+        AnsiConsole.MarkupLine("  gh-copilot-byok remove");
+        AnsiConsole.MarkupLine("  gh-copilot-byok remove azure-gpt ollama-local");
+        AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt");
+        AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt suggest \"create a function\"");
+        AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt -p \"fix the failing tests\"");
+        AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt -p \"refactor this\" --allow-tool=write");
+        AnsiConsole.MarkupLine("  gh-copilot-byok last -p \"explain this code\"");
+        AnsiConsole.MarkupLine("  gh-copilot-byok default");
+        AnsiConsole.MarkupLine("  gh-copilot-byok add");
+        AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry");
+        AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry --all");
+        AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all");
+        AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry --subscription 00000000-0000-0000-0000-000000000000 --all");
 
         return 0;
     }
@@ -199,7 +202,7 @@ class Program
         var action = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("Action:")
-                .AddChoices(new[] { "Use profile", "Remove profile(s)", "Add profile", "Import from Foundry", "Exit" }));
+                .AddChoices(new[] { "Use profile", "Remove profile(s)", "Add profile", "Import from Foundry", "MCP compat servers", "Exit" }));
 
         if (action == "Use profile")
         {
@@ -264,7 +267,142 @@ class Program
             return ImportFoundryCommand(Array.Empty<string>()).GetAwaiter().GetResult();
         }
 
+        if (action == "MCP compat servers")
+        {
+            var compatibleProfiles = profileList.Where(IsAzureByokLikeProfile).ToList();
+            if (compatibleProfiles.Count == 0)
+            {
+                AnsiConsole.MarkupLine("[yellow]No Azure BYOK/proxy profiles found for MCP compatibility settings.[/]");
+                return 0;
+            }
+
+            var selectionInput = AnsiConsole.Ask<string>("[yellow]Profile # (from the table above)[/]: ").Trim();
+            if (!int.TryParse(selectionInput, out var profileSelection)
+                || profileSelection <= 0
+                || profileSelection > profileList.Count)
+            {
+                AnsiConsole.MarkupLine("[red]Invalid selection.[/]");
+                return 1;
+            }
+
+            var selectedProfile = profileList[profileSelection - 1];
+            if (!IsAzureByokLikeProfile(selectedProfile))
+            {
+                AnsiConsole.MarkupLine("[red]Selected profile is not an Azure BYOK/proxy profile.[/]");
+                return 1;
+            }
+
+            var mode = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("MCP action:")
+                    .AddChoices(new[] { "Set (interactive)", "Reset", "All", "None" }));
+
+            var actionName = mode switch
+            {
+                "Reset" => "reset",
+                "All" => "all",
+                "None" => "none",
+                _ => "set"
+            };
+
+            return ConfigureMcpCompatForProfile(selectedProfile.Name, actionName);
+        }
+
         return 0;
+    }
+
+    static bool IsAzureByokLikeProfile(Profile profile)
+    {
+        return (profile.Type == "byok" || profile.Type == "proxy") && IsAzureProfile(profile);
+    }
+
+    static int ConfigureMcpCompatForProfile(string profileName, string action)
+    {
+        var profile = ConfigManager.GetProfile(profileName);
+        if (profile == null)
+        {
+            AnsiConsole.MarkupLine($"[red]Error: Profile '{EscapeMarkup(profileName)}' not found[/]");
+            return 1;
+        }
+
+        if (!IsAzureByokLikeProfile(profile))
+        {
+            AnsiConsole.MarkupLine("[red]MCP compatibility server selection applies only to Azure BYOK/proxy profiles.[/]");
+            return 1;
+        }
+
+        var mode = (action ?? "set").Trim().ToLowerInvariant();
+
+        if (mode == "reset")
+        {
+            profile.McpCompatServers = null;
+            ConfigManager.AddProfile(profile);
+            AnsiConsole.MarkupLine($"[green]Reset MCP compatibility server selection for profile:[/] {EscapeMarkup(profile.Name)}");
+            AnsiConsole.MarkupLine("[dim]The next interactive use will prompt for MCP server selection again.[/]");
+            return 0;
+        }
+
+        if (mode == "all")
+        {
+            var discovered = DiscoverMcpServers();
+            profile.McpCompatServers = discovered.Count > 0
+                ? discovered
+                : new List<string>(DefaultMcpCompatServers);
+            ConfigManager.AddProfile(profile);
+            AnsiConsole.MarkupLine($"[green]Set MCP compatibility servers to all candidates for profile:[/] {EscapeMarkup(profile.Name)}");
+            return 0;
+        }
+
+        if (mode == "none")
+        {
+            profile.McpCompatServers = [];
+            ConfigManager.AddProfile(profile);
+            AnsiConsole.MarkupLine($"[green]Set MCP compatibility servers to none for profile:[/] {EscapeMarkup(profile.Name)}");
+            return 0;
+        }
+
+        profile.McpCompatServers = PromptMcpCompatServers(profile.McpCompatServers);
+        ConfigManager.AddProfile(profile);
+        AnsiConsole.MarkupLine($"[green]Saved MCP compatibility server selection for profile:[/] {EscapeMarkup(profile.Name)}");
+        return 0;
+    }
+
+    static int McpCompatCommand(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            AnsiConsole.MarkupLine("[red]Error: Profile name required[/]");
+            AnsiConsole.MarkupLine("Usage: gh-copilot-byok mcp-compat <profile> [--action set|reset|all|none]");
+            return 1;
+        }
+
+        var profileName = args[0];
+        var action = "set";
+
+        for (var i = 1; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (arg.Equals("--action", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                action = args[++i];
+                continue;
+            }
+
+            if (arg.StartsWith("--action=", StringComparison.OrdinalIgnoreCase))
+            {
+                action = arg[("--action=".Length)..];
+                continue;
+            }
+        }
+
+        var normalized = action.Trim().ToLowerInvariant();
+        if (normalized != "set" && normalized != "reset" && normalized != "all" && normalized != "none")
+        {
+            AnsiConsole.MarkupLine("[red]Error: --action must be one of set, reset, all, none[/]");
+            return 1;
+        }
+
+        return ConfigureMcpCompatForProfile(profileName, normalized);
     }
 
     static int RemoveCommand(string[] args)
@@ -322,7 +460,7 @@ class Program
         if (args.Length == 0)
         {
             AnsiConsole.MarkupLine("[red]Error: Profile name required[/]");
-            AnsiConsole.MarkupLine("Usage: copilotx use <profile> [args...]");
+            AnsiConsole.MarkupLine("Usage: gh-copilot-byok use <profile> [args...]");
             return 1;
         }
 
@@ -357,7 +495,7 @@ class Program
         if (profile == null)
         {
             AnsiConsole.MarkupLine($"[red]Error: Profile '{profileName}' not found[/]");
-            AnsiConsole.MarkupLine("Use 'copilotx list' to see available profiles.");
+            AnsiConsole.MarkupLine("Use 'gh-copilot-byok list' to see available profiles.");
             return 1;
         }
 
@@ -380,7 +518,9 @@ class Program
         var userRequestedInteractive = copilotArgs.Length == 0;
 
         // For Azure BYOK profiles in interactive mode, prompt for MCP servers to disable on first use.
-        var needsCompat = !(Environment.GetEnvironmentVariable("COPILOTX_DISABLE_MCP_COMPAT") ?? string.Empty)
+        var needsCompat = !(Environment.GetEnvironmentVariable("GH_COPILOT_BYOK_DISABLE_MCP_COMPAT")
+            ?? Environment.GetEnvironmentVariable("COPILOTX_DISABLE_MCP_COMPAT")
+            ?? string.Empty)
             .Trim().Equals("off", StringComparison.OrdinalIgnoreCase)
             && (profile.Type == "byok" || profile.Type == "proxy")
             && IsAzureProfile(profile);
@@ -423,7 +563,9 @@ class Program
 
     static string[] BuildCopilotArgs(Profile profile, string[] copilotArgs)
     {
-        var disableCompat = (Environment.GetEnvironmentVariable("COPILOTX_DISABLE_MCP_COMPAT") ?? string.Empty)
+        var disableCompat = (Environment.GetEnvironmentVariable("GH_COPILOT_BYOK_DISABLE_MCP_COMPAT")
+            ?? Environment.GetEnvironmentVariable("COPILOTX_DISABLE_MCP_COMPAT")
+            ?? string.Empty)
             .Trim()
             .Equals("off", StringComparison.OrdinalIgnoreCase);
 
@@ -1193,9 +1335,9 @@ class Program
             AnsiConsole.MarkupLine("  --mode each|all            Prompt per deployment or add all");
             AnsiConsole.MarkupLine("  --all                      Add all discovered deployments without prompts\n");
             AnsiConsole.MarkupLine("[cyan]Examples:[/]");
-            AnsiConsole.MarkupLine("  copilotx import-foundry --mode each");
-            AnsiConsole.MarkupLine("  copilotx import-foundry --all");
-            AnsiConsole.MarkupLine("  copilotx import-foundry --account myfoundry --resource-group my-rg --all");
+            AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry --mode each");
+            AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry --all");
+            AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all");
             return 0;
         }
 

@@ -3,10 +3,20 @@ const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
 
-const DEFAULT_CONFIG_DIR = path.join(os.homedir(), '.copilotx');
+const DEFAULT_CONFIG_DIR = path.join(os.homedir(), '.gh-copilot-byok');
+const LEGACY_CONFIG_DIR = path.join(os.homedir(), '.copilotx');
 
 function getConfigDir() {
-  return process.env.COPILOTX_CONFIG_DIR || DEFAULT_CONFIG_DIR;
+  const configured = process.env.GH_COPILOT_BYOK_CONFIG_DIR || process.env.COPILOTX_CONFIG_DIR;
+  if (configured) {
+    return configured;
+  }
+
+  if (!fs.existsSync(DEFAULT_CONFIG_DIR) && fs.existsSync(LEGACY_CONFIG_DIR)) {
+    return LEGACY_CONFIG_DIR;
+  }
+
+  return DEFAULT_CONFIG_DIR;
 }
 
 function sanitizeSegment(value) {
@@ -41,7 +51,7 @@ function getAzureIdentityKey() {
 }
 
 function resolveConfigFile() {
-  const scope = (process.env.COPILOTX_CONFIG_SCOPE || 'auto').toLowerCase();
+  const scope = (process.env.GH_COPILOT_BYOK_CONFIG_SCOPE || process.env.COPILOTX_CONFIG_SCOPE || 'auto').toLowerCase();
   return resolveConfigFileFor(scope, getAzureIdentityKey());
 }
 

@@ -70,15 +70,29 @@ function shouldUseAzureCliToken(profile, hasApiKey) {
   return !hasApiKey && isAzureProfile(profile);
 }
 
+function getAzCliCommand() {
+  return process.platform === 'win32' ? 'az.cmd' : 'az';
+}
+
+function spawnAz(args) {
+  const azCommand = getAzCliCommand();
+  if (process.platform === 'win32') {
+    const comspec = process.env.ComSpec || 'cmd.exe';
+    return spawn(comspec, ['/d', '/c', azCommand, ...args], {
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+  }
+
+  return spawn(azCommand, args, {
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+}
+
 function getAzureCliToken(profile) {
   const scope = profile.tokenScope || 'https://cognitiveservices.azure.com/.default';
 
   return new Promise((resolve, reject) => {
-    const az = spawn(
-      'az',
-      ['account', 'get-access-token', '--scope', scope, '--query', 'accessToken', '-o', 'tsv'],
-      { stdio: ['ignore', 'pipe', 'pipe'] }
-    );
+    const az = spawnAz(['account', 'get-access-token', '--scope', scope, '--query', 'accessToken', '-o', 'tsv']);
 
     let stdout = '';
     let stderr = '';
@@ -300,7 +314,7 @@ async function promptMcpCompatServers(previousSelection) {
 }
 
 function buildCopilotArgs(profile, copilotArgs = []) {
-  const disableCompat = (process.env.COPILOTX_DISABLE_MCP_COMPAT || '').trim().toLowerCase() === 'off';
+  const disableCompat = (process.env.GH_COPILOT_BYOK_DISABLE_MCP_COMPAT || process.env.COPILOTX_DISABLE_MCP_COMPAT || '').trim().toLowerCase() === 'off';
   const args = [...copilotArgs];
 
   const hasPromptMode = args.includes('-p') || args.includes('--prompt');
@@ -366,8 +380,10 @@ async function promptProfilesToRemove(profiles) {
 }
 
 function runAzJson(args) {
+  const azCommand = getAzCliCommand();
+
   return new Promise((resolve, reject) => {
-    const az = spawn('az', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const az = spawnAz(args);
 
     let stdout = '';
     let stderr = '';
@@ -386,7 +402,7 @@ function runAzJson(args) {
 
     az.on('close', (code) => {
       if (code !== 0) {
-        reject(new Error(`az ${args.join(' ')} failed (exit ${code}): ${stderr.trim()}`));
+        reject(new Error(`${azCommand} ${args.join(' ')} failed (exit ${code}): ${stderr.trim()}`));
         return;
       }
 
@@ -609,7 +625,7 @@ async function executeWithProfile(profileName, copilotArgs = []) {
 
   if (!profile) {
     console.error(`Profile "${profileName}" not found.`);
-    console.error('Use "copilotx list" to see available profiles.');
+    console.error('Use "gh-copilot-byok list" to see available profiles.');
     return 1;
   }
 
@@ -629,13 +645,13 @@ async function executeWithProfile(profileName, copilotArgs = []) {
   const userRequestedInteractive = copilotArgs.length === 0;
 
   // For Azure BYOK profiles in interactive mode, prompt for MCP servers to disable on first use.
-  const needsCompat = !((process.env.COPILOTX_DISABLE_MCP_COMPAT || '').trim().toLowerCase() === 'off')
+  const needsCompat = !((process.env.GH_COPILOT_BYOK_DISABLE_MCP_COMPAT || process.env.COPILOTX_DISABLE_MCP_COMPAT || '').trim().toLowerCase() === 'off')
     && (profile.type === 'byok' || profile.type === 'proxy') && isAzureProfile(profile);
   const hasManualMcpControls = copilotArgs.some((a) =>
     a === '--disable-mcp-server' || a === '--disable-builtin-mcps' || a === '--available-tools'
   );
 
-  if (needsCompat && !hasManualMcpControls && userRequestedInteractive && profile.mcpCompatServers === undefined) {
+  if (needsCompat && !hasManualMcpControls && userRequestedInteractive && profile.mcpCompatServers == null) {
     profile.mcpCompatServers = await promptMcpCompatServers(undefined);
     addProfile(profile);
   }
@@ -665,6 +681,56 @@ async function executeWithProfile(profileName, copilotArgs = []) {
     console.error('Make sure GitHub Copilot CLI is installed: gh extension install github/gh-copilot');
     return 1;
   }
+}
+
+function isAzureByokLikeProfile(profile) {
+  return !!profile
+    && (profile.type === 'byok' || profile.type === 'proxy')
+    && isAzureProfile(profile);
+}
+
+async function configureMcpCompatForProfile(profileName, action) {
+  const profile = getProfile(profileName);
+  if (!profile) {
+    console.error(`Profile "${profileName}" not found.`);
+    return 1;
+  }
+
+  if (!isAzureByokLikeProfile(profile)) {
+    console.error('MCP compatibility server selection is only applicable to Azure BYOK/proxy profiles.');
+    return 1;
+  }
+
+  const normalizedAction = (action || 'set').trim().toLowerCase();
+
+  if (normalizedAction === 'reset') {
+    delete profile.mcpCompatServers;
+    addProfile(profile);
+    console.log(`Reset MCP compatibility server selection for profile: ${profile.name}`);
+    console.log('The next interactive use will prompt for MCP server selection again.');
+    return 0;
+  }
+
+  if (normalizedAction === 'all') {
+    const discovered = discoverMcpServers();
+    const candidates = discovered.length > 0 ? discovered : DEFAULT_MCP_COMPAT_SERVERS;
+    profile.mcpCompatServers = [...candidates];
+    addProfile(profile);
+    console.log(`Set MCP compatibility servers to all candidates for profile: ${profile.name}`);
+    return 0;
+  }
+
+  if (normalizedAction === 'none') {
+    profile.mcpCompatServers = [];
+    addProfile(profile);
+    console.log(`Set MCP compatibility servers to none for profile: ${profile.name}`);
+    return 0;
+  }
+
+  profile.mcpCompatServers = await promptMcpCompatServers(profile.mcpCompatServers);
+  addProfile(profile);
+  console.log(`Saved MCP compatibility server selection for profile: ${profile.name}`);
+  return 0;
 }
 
 async function runAddProfileWizard() {
@@ -756,7 +822,7 @@ async function runAddProfileWizard() {
 }
 
 const argv = yargs(hideBin(process.argv))
-  .scriptName('copilotx')
+  .scriptName('gh-copilot-byok')
   .usage('$0 <command> [options]')
   .command(
     'list',
@@ -792,9 +858,9 @@ const argv = yargs(hideBin(process.argv))
   )
   .command(
     'manage',
-    'Interactive profile management (Use/Remove/Add/Import in one flow)',
+    'Interactive profile management (Use/Remove/Add/Import/MCP in one flow)',
     (yargs) => {
-      yargs.example('$0 manage', 'Choose Use, Remove, Add, or Import from one interactive screen');
+      yargs.example('$0 manage', 'Choose Use, Remove, Add, Import, or MCP server settings from one interactive screen');
     },
     async () => {
       const profiles = listProfiles();
@@ -814,7 +880,7 @@ const argv = yargs(hideBin(process.argv))
 
       const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
       const answer = await new Promise((resolve) => {
-        rl.question('\nAction: [u]se / [r]emove / [a]dd / [i]mport / [Enter] exit: ', (ans) => resolve((ans || '').trim().toLowerCase()));
+        rl.question('\nAction: [u]se / [r]emove / [a]dd / [i]mport / [m]cp / [Enter] exit: ', (ans) => resolve((ans || '').trim().toLowerCase()));
       });
 
       if (!answer) {
@@ -878,6 +944,59 @@ const argv = yargs(hideBin(process.argv))
         return;
       }
 
+      if (answer === 'm' || answer === 'mcp') {
+        const candidates = profiles.filter(isAzureByokLikeProfile);
+        if (!candidates.length) {
+          rl.close();
+          console.log('No Azure BYOK/proxy profiles available for MCP compatibility settings.');
+          process.exit(0);
+          return;
+        }
+
+        console.log('\nAzure BYOK/proxy profiles:');
+        candidates.forEach((p, i) => {
+          const selectedCount = Array.isArray(p.mcpCompatServers) ? p.mcpCompatServers.length : null;
+          const selected = selectedCount === null
+            ? '(not set)'
+            : selectedCount === 0
+              ? '(none)'
+              : `(${selectedCount} selected)`;
+          console.log(`${i + 1}. ${p.name} ${selected}`);
+        });
+
+        const selectionRaw = await new Promise((resolve) => {
+          rl.question('Profile #: ', (ans) => resolve((ans || '').trim()));
+        });
+        const selection = parseInt(selectionRaw, 10);
+        if (isNaN(selection) || selection < 1 || selection > candidates.length) {
+          rl.close();
+          console.log('Invalid selection.');
+          process.exit(1);
+          return;
+        }
+
+        const selectedProfile = candidates[selection - 1];
+        const mode = await new Promise((resolve) => {
+          rl.question('MCP action: [s]et / [x]reset / [n]one / [l]all [set]: ', (ans) => resolve((ans || '').trim().toLowerCase()));
+        });
+        rl.close();
+
+        const actionMap = {
+          '': 'set',
+          s: 'set',
+          set: 'set',
+          x: 'reset',
+          reset: 'reset',
+          n: 'none',
+          none: 'none',
+          l: 'all',
+          all: 'all'
+        };
+        const code = await configureMcpCompatForProfile(selectedProfile.name, actionMap[mode] || 'set');
+        process.exit(code);
+        return;
+      }
+
       rl.close();
       console.log('Unknown action.');
       process.exit(1);
@@ -905,6 +1024,30 @@ const argv = yargs(hideBin(process.argv))
     },
     async (argv) => {
       const code = await executeWithProfile(argv.profile, argv['copilot-args'] || []);
+      process.exit(code);
+    }
+  )
+  .command(
+    'mcp-compat <profile>',
+    'Set or reset saved MCP compatibility servers for an Azure BYOK/proxy profile',
+    (yargs) => {
+      yargs
+        .positional('profile', {
+          describe: 'Profile name to configure',
+          type: 'string'
+        })
+        .option('action', {
+          type: 'string',
+          choices: ['set', 'reset', 'all', 'none'],
+          default: 'set',
+          describe: 'set=interactive selection, reset=clear saved value, all=select all candidates, none=select none'
+        })
+        .example('$0 mcp-compat azure-gpt', 'Interactively set MCP compatibility servers for a profile')
+        .example('$0 mcp-compat azure-gpt --action reset', 'Reset saved MCP compatibility servers for a profile')
+        .example('$0 mcp-compat azure-gpt --action none', 'Disable MCP server compatibility filtering for a profile');
+    },
+    async (argv) => {
+      const code = await configureMcpCompatForProfile(argv.profile, argv.action);
       process.exit(code);
     }
   )
@@ -1038,6 +1181,7 @@ const argv = yargs(hideBin(process.argv))
   )
   .example('$0 list', 'List all profiles; select a number to launch one interactively')
   .example('$0 manage', 'Use or remove profiles from one interactive flow')
+  .example('$0 mcp-compat azure-gpt --action reset', 'Reset MCP compatibility server selections for a profile')
   .example('$0 remove', 'Interactively select profiles to remove')
   .example('$0 use azure-gpt -p "fix the tests"', 'Run a prompt with a specific profile')
   .example('$0 last', 'Use the most recently used profile interactively')

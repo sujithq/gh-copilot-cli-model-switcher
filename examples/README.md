@@ -1,6 +1,6 @@
-# CopilotX Configuration Examples
+# gh-copilot-byok Configuration Examples
 
-This directory contains sample configuration files and usage examples for CopilotX.
+This directory contains sample configuration files and usage examples for gh-copilot-byok.
 
 ## Sample Configuration
 
@@ -20,7 +20,7 @@ See [`config.sample.json`](config.sample.json) for a complete example configurat
 
 **Usage**:
 ```bash
-copilotx use default
+gh-copilot-byok use default
 ```
 
 ### Azure OpenAI with API Key
@@ -42,7 +42,7 @@ export AZURE_OPENAI_KEY="your-api-key-here"
 
 **Usage**:
 ```bash
-copilotx use azure-gpt4 suggest "create a function to parse JSON"
+gh-copilot-byok use azure-gpt4 suggest "create a function to parse JSON"
 ```
 
 ### Azure OpenAI with RBAC (API Keys Disabled, Local Wrapper)
@@ -66,12 +66,12 @@ az login
 
 **Usage**:
 ```bash
-copilotx use azure-rbac-local suggest "create a function to parse JSON"
+gh-copilot-byok use azure-rbac-local suggest "create a function to parse JSON"
 ```
 
 Notes:
 - `azureCliToken: auto` detects Azure profiles and uses Azure CLI token when API key is not configured.
-- On token/auth failures, CopilotX refreshes token and retries once.
+- On token/auth failures, gh-copilot-byok refreshes token and retries once.
 
 ### OpenAI API
 
@@ -92,7 +92,7 @@ export OPENAI_API_KEY="sk-..."
 
 **Usage**:
 ```bash
-copilotx use openai-gpt4 explain "what does this code do"
+gh-copilot-byok use openai-gpt4 explain "what does this code do"
 ```
 
 ### Ollama Local
@@ -120,7 +120,7 @@ ollama serve
 
 **Usage**:
 ```bash
-copilotx use ollama-llama3 suggest "write a hello world script"
+gh-copilot-byok use ollama-llama3 suggest "write a hello world script"
 ```
 
 ### Azure OpenAI via APIM Proxy
@@ -145,7 +145,7 @@ export APIM_SUBSCRIPTION_KEY="your-subscription-key"
 
 **Usage**:
 ```bash
-copilotx use azure-proxy suggest "help me debug this"
+gh-copilot-byok use azure-proxy suggest "help me debug this"
 ```
 
 ## Usage Scenarios
@@ -157,28 +157,28 @@ copilotx use azure-proxy suggest "help me debug this"
 export OPENAI_API_KEY="sk-..."
 
 # Add profile
-copilotx add
+gh-copilot-byok add
 # Enter: openai-dev, byok, https://api.openai.com/v1, gpt-4, env, OPENAI_API_KEY
 
 # Use for coding
-copilotx use openai-dev suggest "create a REST API endpoint"
-copilotx use openai-dev explain "how does this function work"
+gh-copilot-byok use openai-dev suggest "create a REST API endpoint"
+gh-copilot-byok use openai-dev explain "how does this function work"
 ```
 
 ### Scenario 2: Enterprise Azure with Multiple Deployments
 
 ```bash
 # Add production profile
-copilotx add
+gh-copilot-byok add
 # Enter: azure-prod, byok, https://prod.openai.azure.com/..., gpt-4, env, AZURE_PROD_KEY
 
 # Add development profile
-copilotx add
+gh-copilot-byok add
 # Enter: azure-dev, byok, https://dev.openai.azure.com/..., gpt-4, env, AZURE_DEV_KEY
 
 # Use different profiles for different tasks
-copilotx use azure-dev suggest "test function"
-copilotx use azure-prod explain "production code"
+gh-copilot-byok use azure-dev suggest "test function"
+gh-copilot-byok use azure-prod explain "production code"
 ```
 
 ### Scenario 3: Offline Development with Ollama
@@ -189,40 +189,40 @@ ollama pull llama3
 ollama serve
 
 # Add Ollama profile
-copilotx add
+gh-copilot-byok add
 # Enter: local, byok, http://localhost:11434/v1, llama3, none
 
 # Work offline
-copilotx use local suggest "create a function"
-copilotx use local explain "what is this"
+gh-copilot-byok use local suggest "create a function"
+gh-copilot-byok use local explain "what is this"
 ```
 
 ### Scenario 4: Switching Between Models
 
 ```bash
 # List all profiles
-copilotx list
+gh-copilot-byok list
 
 # Try different models for comparison
-copilotx use gpt-4 suggest "optimize this code"
-copilotx use gpt-3.5 suggest "optimize this code"
-copilotx use llama3 suggest "optimize this code"
+gh-copilot-byok use gpt-4 suggest "optimize this code"
+gh-copilot-byok use gpt-3.5 suggest "optimize this code"
+gh-copilot-byok use llama3 suggest "optimize this code"
 
 # Use last profile quickly
-copilotx last suggest "another question"
+gh-copilot-byok last suggest "another question"
 ```
 
 ### Scenario 5: Testing with Different Providers
 
 ```bash
 # Test with OpenAI
-copilotx use openai-gpt4 suggest "write unit tests for this function"
+gh-copilot-byok use openai-gpt4 suggest "write unit tests for this function"
 
 # Test with Azure
-copilotx use azure-gpt4 suggest "write unit tests for this function"
+gh-copilot-byok use azure-gpt4 suggest "write unit tests for this function"
 
 # Test locally
-copilotx use ollama-llama3 suggest "write unit tests for this function"
+gh-copilot-byok use ollama-llama3 suggest "write unit tests for this function"
 
 # Compare results and choose preferred provider
 ```
@@ -329,21 +329,21 @@ Not this:
 
 ```bash
 # Set up your preferred profile
-copilotx use azure-gpt4
+gh-copilot-byok use azure-gpt4
 
 # From now on, just use:
-copilotx last suggest "..."
-copilotx last explain "..."
+gh-copilot-byok last suggest "..."
+gh-copilot-byok last explain "..."
 ```
 
 ### 5. Test Locally First
 
 ```bash
 # Test with Ollama before using paid APIs
-copilotx use ollama-local suggest "is this approach correct?"
+gh-copilot-byok use ollama-local suggest "is this approach correct?"
 
 # Once confirmed, switch to production
-copilotx use azure-prod suggest "implement the final version"
+gh-copilot-byok use azure-prod suggest "implement the final version"
 ```
 
 ## Troubleshooting Examples
@@ -366,10 +366,10 @@ source ~/.bashrc
 
 ```bash
 # List current configuration
-copilotx list
+gh-copilot-byok list
 
 # Update profile
-copilotx add
+gh-copilot-byok add
 # Use same name to update existing profile
 ```
 
@@ -402,7 +402,7 @@ You can copy the config file to project directories:
 
 ```bash
 # Copy to project
-cp ~/.copilotx/config.json ./my-project/.copilotx.json
+cp ~/.gh-copilot-byok/config.json ./my-project/.gh-copilot-byok.json
 
 # Use different profiles per project
 # (Future enhancement)
@@ -412,9 +412,9 @@ cp ~/.copilotx/config.json ./my-project/.copilotx.json
 
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
-alias cx='copilotx'
-alias cxl='copilotx last'
-alias cxs='copilotx use'
+alias cx='gh-copilot-byok'
+alias cxl='gh-copilot-byok last'
+alias cxs='gh-copilot-byok use'
 
 # Usage
 cx list
@@ -428,25 +428,25 @@ cxs azure-prod explain "this code"
 
 ```bash
 # Morning: Start with default Copilot
-copilotx default
+gh-copilot-byok default
 
 # Need Azure features: Switch to Azure
-copilotx use azure-gpt4
+gh-copilot-byok use azure-gpt4
 
 # Working offline: Switch to Ollama
-copilotx use ollama-local
+gh-copilot-byok use ollama-local
 
 # Quick subsequent uses
-copilotx last
+gh-copilot-byok last
 ```
 
 ### Workflow 2: Code Review
 
 ```bash
 # Review with multiple models
-copilotx use gpt-4 explain "review this code"
-copilotx use azure-gpt4 explain "review this code"
-copilotx use claude explain "review this code"
+gh-copilot-byok use gpt-4 explain "review this code"
+gh-copilot-byok use azure-gpt4 explain "review this code"
+gh-copilot-byok use claude explain "review this code"
 
 # Compare insights from different models
 ```
@@ -457,7 +457,7 @@ copilotx use claude explain "review this code"
 # Test prompt with each model
 for profile in gpt-4 gpt-3.5 llama3; do
   echo "Testing with $profile"
-  copilotx use $profile suggest "optimize this algorithm"
+  gh-copilot-byok use $profile suggest "optimize this algorithm"
 done
 ```
 
@@ -468,7 +468,7 @@ done
 ```bash
 # .git/hooks/pre-commit
 #!/bin/bash
-copilotx use azure-dev explain "check code quality of staged files"
+gh-copilot-byok use azure-dev explain "check code quality of staged files"
 ```
 
 ### With CI/CD
@@ -478,7 +478,7 @@ copilotx use azure-dev explain "check code quality of staged files"
 - name: AI Code Review
   run: |
     export AZURE_OPENAI_KEY="${{ secrets.AZURE_OPENAI_KEY }}"
-    copilotx use azure-gpt4 explain "review changes"
+    gh-copilot-byok use azure-gpt4 explain "review changes"
 ```
 
 ### With VS Code Tasks
@@ -490,7 +490,7 @@ copilotx use azure-dev explain "check code quality of staged files"
     {
       "label": "Copilot Explain",
       "type": "shell",
-      "command": "copilotx last explain '${selectedText}'"
+      "command": "gh-copilot-byok last explain '${selectedText}'"
     }
   ]
 }

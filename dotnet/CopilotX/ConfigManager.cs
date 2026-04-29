@@ -57,12 +57,30 @@ public class ConfigManager
 
     private static readonly string DefaultConfigDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".gh-copilot-byok"
+    );
+
+    private static readonly string LegacyConfigDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".copilotx"
     );
 
     private static string GetConfigDir()
     {
-        return Environment.GetEnvironmentVariable("COPILOTX_CONFIG_DIR") ?? DefaultConfigDir;
+        var configured = Environment.GetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_DIR")
+            ?? Environment.GetEnvironmentVariable("COPILOTX_CONFIG_DIR");
+
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured;
+        }
+
+        if (!Directory.Exists(DefaultConfigDir) && Directory.Exists(LegacyConfigDir))
+        {
+            return LegacyConfigDir;
+        }
+
+        return DefaultConfigDir;
     }
 
     private static string GetAzureCliCommand()
@@ -163,7 +181,9 @@ public class ConfigManager
     private static string ResolveConfigFile()
     {
         var configDir = GetConfigDir();
-        var scope = (Environment.GetEnvironmentVariable("COPILOTX_CONFIG_SCOPE") ?? "auto").ToLowerInvariant();
+        var scope = (Environment.GetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_SCOPE")
+            ?? Environment.GetEnvironmentVariable("COPILOTX_CONFIG_SCOPE")
+            ?? "auto").ToLowerInvariant();
         var identityKey = GetAzureIdentityKey();
         return ResolveConfigFileFor(configDir, scope, identityKey);
     }

@@ -1,8 +1,8 @@
-# CopilotX - Implementation Summary
+# gh-copilot-byok - Implementation Summary
 
 ## ✅ Completed Implementation
 
-This repository now contains a complete implementation of the CopilotX CLI tool as specified in the design requirements. Two fully functional implementations have been created:
+This repository now contains a complete implementation of the gh-copilot-byok CLI tool as specified in the design requirements. Two fully functional implementations have been created:
 
 ### 1. Node.js Implementation
 **Location**: `/nodejs`
@@ -21,7 +21,7 @@ This repository now contains a complete implementation of the CopilotX CLI tool 
 - ✅ Azure CLI token auth mode for keyless Azure RBAC profiles
 - ✅ Auto-detect Azure profiles in token `auto` mode when API key is absent
 - ✅ One-time retry with token refresh on auth/token expiry failures
-- ✅ Config persistence in `~/.copilotx/config.json`
+- ✅ Config persistence in `~/.gh-copilot-byok/config.json`
 - ✅ Support for copilot, byok, and proxy profile types
 - ✅ Argument forwarding to `gh copilot`
 - ✅ Error handling and user-friendly messages
@@ -76,18 +76,18 @@ This repository now contains a complete implementation of the CopilotX CLI tool 
 ### Core Requirements ✅
 
 1. **Easy switching between models** ✅
-   - `copilotx use <profile>` command
-   - Quick access with `copilotx last`
-   - Switch to default with `copilotx default`
+   - `gh-copilot-byok use <profile>` command
+   - Quick access with `gh-copilot-byok last`
+   - Switch to default with `gh-copilot-byok default`
 
 2. **Persist configurations locally** ✅
-   - Config stored in `~/.copilotx/config.json`
+   - Config stored in `~/.gh-copilot-byok/config.json`
    - Automatic creation of config directory
    - JSON format for easy editing
 
 3. **Reuse previous configurations** ✅
    - `lastUsed` tracking
-   - `copilotx last` command
+   - `gh-copilot-byok last` command
    - Profile history maintained
 
 4. **Support enterprise scenarios** ✅
@@ -137,7 +137,7 @@ All required environment variables are set:
 ### Component Structure
 
 ```
-CopilotX
+gh-copilot-byok
 ├── nodejs/                 # Node.js implementation
 │   ├── index.js           # Main CLI app
 │   ├── config.js          # Config manager
@@ -202,7 +202,7 @@ npm link
 ```bash
 cd dotnet/CopilotX
 dotnet pack
-dotnet tool install --global --add-source ./nupkg CopilotX
+dotnet tool install --global --add-source ./nupkg gh-copilot-byok
 ```
 
 ## 🧪 Testing Performed
@@ -246,19 +246,19 @@ Both implementations are:
 
 ```bash
 # List profiles
-copilotx list
+gh-copilot-byok list
 
 # Add new profile
-copilotx add
+gh-copilot-byok add
 
 # Use specific profile
-copilotx use azure-gpt4 suggest "create a function"
+gh-copilot-byok use azure-gpt4 suggest "create a function"
 
 # Use last profile
-copilotx last explain "this code"
+gh-copilot-byok last explain "this code"
 
 # Switch to default
-copilotx default
+gh-copilot-byok default
 ```
 
 ## 🎨 Highlights

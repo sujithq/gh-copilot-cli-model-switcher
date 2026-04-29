@@ -1,10 +1,10 @@
-# GitHub Copilot CLI Model Switcher (CopilotX)
+# GitHub Copilot CLI Model Switcher (gh-copilot-byok)
 
 A lightweight CLI wrapper ("minitool") around GitHub Copilot CLI that enables easy switching between default Copilot models and custom BYOK (Bring Your Own Key) models.
 
 ## 🎯 Overview
 
-CopilotX allows you to:
+gh-copilot-byok allows you to:
 
 - ✅ Easily switch between default Copilot and custom models
 - ✅ Persist model configurations locally
@@ -39,7 +39,7 @@ Both implementations share the same configuration format and provide identical f
 cd nodejs
 npm install
 npm link
-copilotx list
+gh-copilot-byok list
 ```
 
 ## ✅ Testing
@@ -73,8 +73,8 @@ The `.NET` test project uses xUnit with a lightweight console test runner.
 ```bash
 cd dotnet/CopilotX
 dotnet pack
-dotnet tool install --global --add-source ./nupkg CopilotX
-copilotx list
+dotnet tool install --global --add-source ./nupkg gh-copilot-byok
+gh-copilot-byok list
 ```
 
 ## 🎮 Usage
@@ -83,29 +83,29 @@ All commands are identical across both implementations:
 
 ```bash
 # List available profiles (interactive menu: select #, then press Enter to use)
-copilotx list
-copilotx list
+gh-copilot-byok list
+gh-copilot-byok list
 
 # Use a specific profile
-copilotx use azure-gpt
+gh-copilot-byok use azure-gpt
 
 # Add a new profile
-copilotx add
+gh-copilot-byok add
 
 # Use last profile
-copilotx last
+gh-copilot-byok last
 
 # Use default Copilot
-copilotx default
+gh-copilot-byok default
 
 # Import profiles from Foundry / Azure OpenAI / Azure AI Services deployments
-copilotx import-foundry --mode each
+gh-copilot-byok import-foundry --mode each
 
 # Import all discovered deployments from all applicable accounts
-copilotx import-foundry --all
+gh-copilot-byok import-foundry --all
 
 # Import from one account/resource group
-copilotx import-foundry --account myfoundry --resource-group my-rg --all
+gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all
 ```
 
 ## 🧱 Core Concepts
@@ -119,9 +119,9 @@ GitHub Copilot CLI can connect to external models via environment variables:
 - `COPILOT_MODEL`
 - `COPILOT_PROVIDER_TYPE`
 
-CopilotX can now source Azure CLI access tokens when API keys are disabled. In token mode, it sets `COPILOT_PROVIDER_BEARER_TOKEN` and clears `COPILOT_PROVIDER_API_KEY` to avoid auth-mode ambiguity.
+gh-copilot-byok can now source Azure CLI access tokens when API keys are disabled. In token mode, it sets `COPILOT_PROVIDER_BEARER_TOKEN` and clears `COPILOT_PROVIDER_API_KEY` to avoid auth-mode ambiguity.
 
-For Azure BYOK profiles, CopilotX also enables an MCP compatibility mode by default to avoid provider tool-count limits (e.g. `tools array too long`). It launches `gh copilot` with MCP-disable flags for common high-volume servers. Set `COPILOTX_DISABLE_MCP_COMPAT=off` to opt out.
+For Azure BYOK profiles, gh-copilot-byok also enables an MCP compatibility mode by default to avoid provider tool-count limits (e.g. `tools array too long`). It launches `gh copilot` with MCP-disable flags for common high-volume servers. Set `GH_COPILOT_BYOK_DISABLE_MCP_COMPAT=off` to opt out.
 
 This allows connecting to:
 - OpenAI
@@ -144,17 +144,17 @@ Any model used must support:
 
 ## 📝 Configuration
 
-Profiles are stored in an active config file under `~/.copilotx/`.
+Profiles are stored in an active config file under `~/.gh-copilot-byok/`.
 
 Config scope behavior:
-- `COPILOTX_CONFIG_SCOPE=auto` (default): use Azure user-scoped config when `az account show` is available, otherwise global config
-- `COPILOTX_CONFIG_SCOPE=azure-user`: always use Azure user-scoped config
-- `COPILOTX_CONFIG_SCOPE=global`: always use `~/.copilotx/config.json`
+- `GH_COPILOT_BYOK_CONFIG_SCOPE=auto` (default): use Azure user-scoped config when `az account show` is available, otherwise global config
+- `GH_COPILOT_BYOK_CONFIG_SCOPE=azure-user`: always use Azure user-scoped config
+- `GH_COPILOT_BYOK_CONFIG_SCOPE=global`: always use `~/.gh-copilot-byok/config.json`
 
 In Azure user-scoped mode, file name format is:
-- `~/.copilotx/config.<tenantId>__<userName>.json`
+- `~/.gh-copilot-byok/config.<tenantId>__<userName>.json`
 
-Use `copilotx list` to see which config file is currently active.
+Use `gh-copilot-byok list` to see which config file is currently active.
 
 Example JSON content:
 
@@ -261,7 +261,7 @@ The proxy handles:
 
 ### Azure OpenAI with RBAC (No API Keys, Local Wrapper)
 
-For environments where API keys are disabled, CopilotX can acquire an Entra token directly using Azure CLI:
+For environments where API keys are disabled, gh-copilot-byok can acquire an Entra token directly using Azure CLI:
 
 ```json
 {
@@ -332,7 +332,7 @@ export COPILOT_MODEL=<model>
 gh copilot
 ```
 
-CopilotX handles this switching automatically based on the selected profile.
+gh-copilot-byok handles this switching automatically based on the selected profile.
 
 ## 🧭 Import From Foundry
 
@@ -347,16 +347,16 @@ Examples:
 
 ```bash
 # Scan all accounts and prompt per deployment
-copilotx import-foundry --mode each
+gh-copilot-byok import-foundry --mode each
 
 # Scan all accounts and add all discovered deployments
-copilotx import-foundry --all
+gh-copilot-byok import-foundry --all
 
 # Target one account/resource group
-copilotx import-foundry --account myfoundry --resource-group my-rg --mode each
+gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --mode each
 
 # Scope by subscription
-copilotx import-foundry --subscription <subscription-id> --all
+gh-copilot-byok import-foundry --subscription <subscription-id> --all
 ```
 
 ## 📚 Examples
@@ -365,13 +365,13 @@ copilotx import-foundry --subscription <subscription-id> --all
 
 #### Node.js Version
 ```bash
-copilotx add
+gh-copilot-byok add
 # Follow the interactive prompts
 ```
 
 #### .NET Version (with Spectre.Console)
 ```bash
-copilotx add
+gh-copilot-byok add
 # Beautiful interactive prompts with selection menus
 # Secure password input for API keys
 ```
@@ -380,19 +380,19 @@ copilotx add
 
 ```bash
 # List all profiles
-copilotx list
+gh-copilot-byok list
 
 # Use Azure profile with Copilot suggest
-copilotx use azure-gpt suggest "create a function to sort an array"
+gh-copilot-byok use azure-gpt suggest "create a function to sort an array"
 
 # Use Ollama for local inference
-copilotx use ollama-local explain "what is this code"
+gh-copilot-byok use ollama-local explain "what is this code"
 
 # Quick access to last used profile
-copilotx last suggest "how to debug this"
+gh-copilot-byok last suggest "how to debug this"
 
 # Switch back to default
-copilotx default
+gh-copilot-byok default
 ```
 
 ## 🛠️ Architecture
@@ -424,7 +424,7 @@ Return Result
 
 1. **Use Environment Variables**: Store API keys in environment variables, not directly in config
 2. **API Key Security**: Use `apiKeyEnv` instead of `apiKey` in profiles
-3. **File Permissions**: Ensure `~/.copilotx/config.json` has appropriate permissions
+3. **File Permissions**: Ensure `~/.gh-copilot-byok/config.json` has appropriate permissions
 4. **Enterprise RBAC**: Use proxy layer for token-based authentication
 5. **Identity Separation**: Azure user-scoped config keeps profiles separate when switching users with `az login`
 

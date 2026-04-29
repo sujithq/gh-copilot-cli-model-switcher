@@ -1,4 +1,4 @@
-# CopilotX Architecture & Design
+# gh-copilot-byok Architecture & Design
 
 ## 🎯 Design Goals
 
@@ -73,7 +73,7 @@
 
 **Responsibility**: Manage profile storage and retrieval
 
-**Storage Location**: `~/.copilotx/config.json`
+**Storage Location**: `~/.gh-copilot-byok/config.json`
 
 **Methods**:
 - `loadConfig()`: Read configuration from disk
@@ -178,7 +178,7 @@ Confirm Success
 ### Using a Profile
 
 ```
-Command: copilotx use azure-gpt suggest "help"
+Command: gh-copilot-byok use azure-gpt suggest "help"
     ↓
 Parse Arguments
     profile: "azure-gpt"
@@ -207,7 +207,7 @@ Return Exit Code
 ### Pattern 1: Direct API Key
 
 ```
-CopilotX → GitHub Copilot CLI → Azure OpenAI (API Key)
+gh-copilot-byok → GitHub Copilot CLI → Azure OpenAI (API Key)
 ```
 
 **Use Case**: Environments where API keys are allowed
@@ -216,7 +216,7 @@ CopilotX → GitHub Copilot CLI → Azure OpenAI (API Key)
 ### Pattern 2: RBAC with Proxy
 
 ```
-CopilotX → GitHub Copilot CLI → Proxy → Azure OpenAI (RBAC)
+gh-copilot-byok → GitHub Copilot CLI → Proxy → Azure OpenAI (RBAC)
 ```
 
 **Use Case**: Enterprise environments with RBAC-only access
@@ -230,7 +230,7 @@ CopilotX → GitHub Copilot CLI → Proxy → Azure OpenAI (RBAC)
 ### Pattern 2b: RBAC Local Wrapper (No API Keys)
 
 ```
-CopilotX → Azure CLI token → GitHub Copilot CLI → Azure OpenAI (RBAC)
+gh-copilot-byok → Azure CLI token → GitHub Copilot CLI → Azure OpenAI (RBAC)
 ```
 
 **Use Case**: API keys disabled, local developer workflow
@@ -242,7 +242,7 @@ CopilotX → Azure CLI token → GitHub Copilot CLI → Azure OpenAI (RBAC)
 ### Pattern 3: Local Models
 
 ```
-CopilotX → GitHub Copilot CLI → Ollama/vLLM → Local Model
+gh-copilot-byok → GitHub Copilot CLI → Ollama/vLLM → Local Model
 ```
 
 **Use Case**: Offline scenarios, privacy-sensitive environments
@@ -267,7 +267,7 @@ CopilotX → GitHub Copilot CLI → Ollama/vLLM → Local Model
 
 ### File Permissions
 
-**Config File**: `~/.copilotx/config.json`
+**Config File**: `~/.gh-copilot-byok/config.json`
 - Should have restricted permissions (600)
 - Only user should have read/write access
 
@@ -357,26 +357,26 @@ For local wrapper token mode:
 
 1. **Profile Templates**:
    ```
-   copilotx add --template azure
-   copilotx add --template ollama
+   gh-copilot-byok add --template azure
+   gh-copilot-byok add --template ollama
    ```
 
 2. **Per-Repository Profiles**:
    ```
-   .copilotx.json in project root
+   .gh-copilot-byok.json in project root
    Override global config
    ```
 
 3. **Shell Completion**:
    ```
-   copilotx completion bash
-   copilotx completion zsh
+   gh-copilot-byok completion bash
+   gh-copilot-byok completion zsh
    ```
 
 4. **Profile Import/Export**:
    ```
-   copilotx export azure-profile > azure.json
-   copilotx import azure.json
+   gh-copilot-byok export azure-profile > azure.json
+   gh-copilot-byok import azure.json
    ```
 
 5. **Model Routing**:
@@ -430,7 +430,7 @@ For local wrapper token mode:
 1. **Profile Not Found**:
    ```
    Error: Profile 'xyz' not found
-   Use 'copilotx list' to see available profiles.
+   Use 'gh-copilot-byok list' to see available profiles.
    ```
 
 2. **Missing API Key**:
@@ -466,7 +466,7 @@ For local wrapper token mode:
 ```
 Initial State (Default Profile)
     ↓
-User: copilotx use azure-gpt
+User: gh-copilot-byok use azure-gpt
     ↓
 Active State (Azure Profile)
     ↓
@@ -499,7 +499,7 @@ Return to Shell (State Persisted)
 - Exit codes
 
 ### File System
-- Config storage (~/.copilotx/)
+- Config storage (~/.gh-copilot-byok/)
 - File permissions
 - JSON serialization
 
