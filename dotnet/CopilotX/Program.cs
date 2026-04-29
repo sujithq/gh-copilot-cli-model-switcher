@@ -65,7 +65,7 @@ class Program
         table.AddColumn("Description");
 
         table.AddRow("[cyan]list[/]", "List all available profiles (read-only)");
-        table.AddRow("[cyan]manage[/]", "Interactive profile management (Use/Remove)");
+        table.AddRow("[cyan]manage[/]", "Interactive profile management (Use/Remove/Add/Import)");
         table.AddRow("[cyan]remove [[profiles...]][/]", "Remove one or more profiles (interactive multi-select)");
         table.AddRow("[cyan]use <profile> [[args...]][/]", "Switch to a specific profile and run gh copilot");
         table.AddRow("[cyan]last [[args...]][/]", "Use the last used profile and run gh copilot");
@@ -199,7 +199,7 @@ class Program
         var action = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("Action:")
-                .AddChoices(new[] { "Use profile", "Remove profile(s)", "Exit" }));
+                .AddChoices(new[] { "Use profile", "Remove profile(s)", "Add profile", "Import from Foundry", "Exit" }));
 
         if (action == "Use profile")
         {
@@ -251,6 +251,17 @@ class Program
             }
 
             AnsiConsole.MarkupLine($"[green]Removed {result.Removed} profile(s).[/]");
+            return 0;
+        }
+
+        if (action == "Add profile")
+        {
+            return AddCommand();
+        }
+
+        if (action == "Import from Foundry")
+        {
+            return ImportFoundryCommand(Array.Empty<string>()).GetAwaiter().GetResult();
         }
 
         return 0;
