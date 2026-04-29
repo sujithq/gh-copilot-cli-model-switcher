@@ -4,6 +4,12 @@ on:
   release:
     types:
       - published
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to publish (for example, gh-copilot-byok-v1.1.0 or v1.1.0)
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -37,9 +43,23 @@ jobs:
       - name: Pack
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          DISPATCH_TAG: ${{ inputs.release_tag }}
         run: |
-          VERSION="${RELEASE_TAG#v}"
-          dotnet pack $PROJECT_PATH -c Release --no-build --nologo /p:Version=$VERSION
+          TAG="$RELEASE_TAG"
+          if [ -n "$DISPATCH_TAG" ]; then
+            TAG="$DISPATCH_TAG"
+          fi
+
+          # Support both v1.2.3 and gh-copilot-byok-v1.2.3 tag formats.
+          VERSION="${TAG##*-v}"
+          VERSION="${VERSION#v}"
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Could not parse semantic version from tag '$TAG'"
+            exit 1
+          fi
+
+          dotnet pack $PROJECT_PATH -c Release --no-build --nologo /p:Version="$VERSION"
 
       - name: Push package to GitHub Packages (NuGet)
         env:
@@ -54,7 +74,7 @@ jobs:
       - name: Upload release assets
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.event.release.tag_name }}
+          tag_name: ${{ inputs.release_tag || github.event.release.tag_name }}
           append_body: false
           files: |
             dotnet/CopilotX/nupkg/*.nupkg
