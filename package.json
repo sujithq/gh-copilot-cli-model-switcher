@@ -1,0 +1,24 @@
+{
+  "name": "gh-copilot-cli-model-switcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lightweight wrapper to switch GitHub Copilot CLI models via local profiles",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "copilotx": "./src/copilotx.js"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "node --test",
+    "format": "prettier -w ."
+  },
+  "dependencies": {
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "eslint": "^9.22.0",
+    "prettier": "^3.5.3"
+  }
+}
+
