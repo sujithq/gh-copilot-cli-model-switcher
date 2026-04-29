@@ -1,0 +1,23 @@
+{
+  "name": "copilotx",
+  "version": "1.0.0",
+  "description": "A lightweight CLI wrapper around GitHub Copilot CLI for easy model switching",
+  "main": "index.js",
+  "bin": {
+    "copilotx": "./index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "copilot",
+    "cli",
+    "model-switcher",
+    "byok"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "yargs": "^17.7.2"
+  }
+}

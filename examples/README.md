@@ -1,0 +1,461 @@
+# CopilotX Configuration Examples
+
+This directory contains sample configuration files and usage examples for CopilotX.
+
+## Sample Configuration
+
+See [`config.sample.json`](config.sample.json) for a complete example configuration with multiple profile types.
+
+## Profile Examples
+
+### Default GitHub Copilot
+
+```json
+{
+  "name": "default",
+  "type": "copilot",
+  "model": "auto"
+}
+```
+
+**Usage**:
+```bash
+copilotx use default
+```
+
+### Azure OpenAI with API Key
+
+```json
+{
+  "name": "azure-gpt4",
+  "type": "byok",
+  "baseUrl": "https://your-resource.openai.azure.com/openai/deployments/gpt-4",
+  "apiKeyEnv": "AZURE_OPENAI_KEY",
+  "model": "gpt-4"
+}
+```
+
+**Setup**:
+```bash
+export AZURE_OPENAI_KEY="your-api-key-here"
+```
+
+**Usage**:
+```bash
+copilotx use azure-gpt4 suggest "create a function to parse JSON"
+```
+
+### OpenAI API
+
+```json
+{
+  "name": "openai-gpt4",
+  "type": "byok",
+  "baseUrl": "https://api.openai.com/v1",
+  "apiKeyEnv": "OPENAI_API_KEY",
+  "model": "gpt-4"
+}
+```
+
+**Setup**:
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+**Usage**:
+```bash
+copilotx use openai-gpt4 explain "what does this code do"
+```
+
+### Ollama Local
+
+```json
+{
+  "name": "ollama-llama3",
+  "type": "byok",
+  "baseUrl": "http://localhost:11434/v1",
+  "model": "llama3"
+}
+```
+
+**Prerequisites**:
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull model
+ollama pull llama3
+
+# Start Ollama server (usually auto-starts)
+ollama serve
+```
+
+**Usage**:
+```bash
+copilotx use ollama-llama3 suggest "write a hello world script"
+```
+
+### Azure OpenAI via APIM Proxy
+
+For enterprise scenarios with RBAC and API Management:
+
+```json
+{
+  "name": "azure-proxy",
+  "type": "proxy",
+  "baseUrl": "https://your-apim.azure-api.net",
+  "apiKeyEnv": "APIM_SUBSCRIPTION_KEY",
+  "model": "gpt-4",
+  "providerType": "azure"
+}
+```
+
+**Setup**:
+```bash
+export APIM_SUBSCRIPTION_KEY="your-subscription-key"
+```
+
+**Usage**:
+```bash
+copilotx use azure-proxy suggest "help me debug this"
+```
+
+## Usage Scenarios
+
+### Scenario 1: Quick Development with OpenAI
+
+```bash
+# Set up API key once
+export OPENAI_API_KEY="sk-..."
+
+# Add profile
+copilotx add
+# Enter: openai-dev, byok, https://api.openai.com/v1, gpt-4, env, OPENAI_API_KEY
+
+# Use for coding
+copilotx use openai-dev suggest "create a REST API endpoint"
+copilotx use openai-dev explain "how does this function work"
+```
+
+### Scenario 2: Enterprise Azure with Multiple Deployments
+
+```bash
+# Add production profile
+copilotx add
+# Enter: azure-prod, byok, https://prod.openai.azure.com/..., gpt-4, env, AZURE_PROD_KEY
+
+# Add development profile
+copilotx add
+# Enter: azure-dev, byok, https://dev.openai.azure.com/..., gpt-4, env, AZURE_DEV_KEY
+
+# Use different profiles for different tasks
+copilotx use azure-dev suggest "test function"
+copilotx use azure-prod explain "production code"
+```
+
+### Scenario 3: Offline Development with Ollama
+
+```bash
+# Start Ollama
+ollama pull llama3
+ollama serve
+
+# Add Ollama profile
+copilotx add
+# Enter: local, byok, http://localhost:11434/v1, llama3, none
+
+# Work offline
+copilotx use local suggest "create a function"
+copilotx use local explain "what is this"
+```
+
+### Scenario 4: Switching Between Models
+
+```bash
+# List all profiles
+copilotx list
+
+# Try different models for comparison
+copilotx use gpt-4 suggest "optimize this code"
+copilotx use gpt-3.5 suggest "optimize this code"
+copilotx use llama3 suggest "optimize this code"
+
+# Use last profile quickly
+copilotx last suggest "another question"
+```
+
+### Scenario 5: Testing with Different Providers
+
+```bash
+# Test with OpenAI
+copilotx use openai-gpt4 suggest "write unit tests for this function"
+
+# Test with Azure
+copilotx use azure-gpt4 suggest "write unit tests for this function"
+
+# Test locally
+copilotx use ollama-llama3 suggest "write unit tests for this function"
+
+# Compare results and choose preferred provider
+```
+
+## Environment Variables Reference
+
+### Azure OpenAI
+
+```bash
+export AZURE_OPENAI_KEY="your-key"
+export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
+```
+
+### OpenAI
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+### API Management
+
+```bash
+export APIM_SUBSCRIPTION_KEY="your-subscription-key"
+export APIM_BASE_URL="https://your-apim.azure-api.net"
+```
+
+### Multiple Environments
+
+```bash
+# Development
+export AZURE_DEV_KEY="dev-key"
+
+# Staging
+export AZURE_STAGING_KEY="staging-key"
+
+# Production
+export AZURE_PROD_KEY="prod-key"
+```
+
+## Tips & Best Practices
+
+### 1. Use Meaningful Profile Names
+
+Good:
+```
+azure-gpt4-prod
+azure-gpt35-dev
+ollama-local-llama3
+openai-gpt4
+```
+
+Bad:
+```
+profile1
+test
+my-profile
+```
+
+### 2. Organize by Purpose
+
+```json
+{
+  "profiles": [
+    // Default
+    { "name": "default", "type": "copilot" },
+
+    // Development
+    { "name": "dev-gpt35", "type": "byok", ... },
+
+    // Production
+    { "name": "prod-gpt4", "type": "byok", ... },
+
+    // Local/Offline
+    { "name": "local-llama3", "type": "byok", ... }
+  ]
+}
+```
+
+### 3. Keep API Keys in Environment Variables
+
+Do this:
+```json
+{
+  "apiKeyEnv": "AZURE_OPENAI_KEY"
+}
+```
+
+Not this:
+```json
+{
+  "apiKey": "actual-key-here"  // Don't do this!
+}
+```
+
+### 4. Use Last Profile for Quick Access
+
+```bash
+# Set up your preferred profile
+copilotx use azure-gpt4
+
+# From now on, just use:
+copilotx last suggest "..."
+copilotx last explain "..."
+```
+
+### 5. Test Locally First
+
+```bash
+# Test with Ollama before using paid APIs
+copilotx use ollama-local suggest "is this approach correct?"
+
+# Once confirmed, switch to production
+copilotx use azure-prod suggest "implement the final version"
+```
+
+## Troubleshooting Examples
+
+### Issue: API Key Not Found
+
+```bash
+# Check if environment variable is set
+echo $AZURE_OPENAI_KEY
+
+# If not, set it
+export AZURE_OPENAI_KEY="your-key"
+
+# Or add to shell profile
+echo 'export AZURE_OPENAI_KEY="your-key"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Issue: Wrong Base URL
+
+```bash
+# List current configuration
+copilotx list
+
+# Update profile
+copilotx add
+# Use same name to update existing profile
+```
+
+### Issue: Model Not Found
+
+```bash
+# For Ollama, ensure model is pulled
+ollama list
+ollama pull llama3
+
+# For Azure, check deployment name matches
+```
+
+## Advanced Configuration
+
+### Multiple API Keys
+
+```bash
+# In ~/.bashrc or ~/.zshrc
+export OPENAI_API_KEY_PERSONAL="sk-..."
+export OPENAI_API_KEY_WORK="sk-..."
+
+export AZURE_OPENAI_KEY_DEV="..."
+export AZURE_OPENAI_KEY_PROD="..."
+```
+
+### Per-Project Configuration
+
+You can copy the config file to project directories:
+
+```bash
+# Copy to project
+cp ~/.copilotx/config.json ./my-project/.copilotx.json
+
+# Use different profiles per project
+# (Future enhancement)
+```
+
+### Shell Aliases
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+alias cx='copilotx'
+alias cxl='copilotx last'
+alias cxs='copilotx use'
+
+# Usage
+cx list
+cxl suggest "create a function"
+cxs azure-prod explain "this code"
+```
+
+## Sample Workflows
+
+### Workflow 1: Daily Development
+
+```bash
+# Morning: Start with default Copilot
+copilotx default
+
+# Need Azure features: Switch to Azure
+copilotx use azure-gpt4
+
+# Working offline: Switch to Ollama
+copilotx use ollama-local
+
+# Quick subsequent uses
+copilotx last
+```
+
+### Workflow 2: Code Review
+
+```bash
+# Review with multiple models
+copilotx use gpt-4 explain "review this code"
+copilotx use azure-gpt4 explain "review this code"
+copilotx use claude explain "review this code"
+
+# Compare insights from different models
+```
+
+### Workflow 3: Testing Different Models
+
+```bash
+# Test prompt with each model
+for profile in gpt-4 gpt-3.5 llama3; do
+  echo "Testing with $profile"
+  copilotx use $profile suggest "optimize this algorithm"
+done
+```
+
+## Integration Examples
+
+### With Git Hooks
+
+```bash
+# .git/hooks/pre-commit
+#!/bin/bash
+copilotx use azure-dev explain "check code quality of staged files"
+```
+
+### With CI/CD
+
+```bash
+# GitHub Actions
+- name: AI Code Review
+  run: |
+    export AZURE_OPENAI_KEY="${{ secrets.AZURE_OPENAI_KEY }}"
+    copilotx use azure-gpt4 explain "review changes"
+```
+
+### With VS Code Tasks
+
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Copilot Explain",
+      "type": "shell",
+      "command": "copilotx last explain '${selectedText}'"
+    }
+  ]
+}
+```
