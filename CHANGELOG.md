@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1](https://github.com/sujithq/gh-copilot-cli-model-switcher/compare/gh-copilot-byok-v1.1.0...gh-copilot-byok-v1.1.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* enhance release workflow to support manual dispatch with custom release tags ([f5ce335](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/f5ce33559368b0311c17d80574507fabba419fb4))
+* publish dotnet tool to NuGet.org so it can be installed without authentication ([e9dd58e](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/e9dd58e1378992ca073f2780e4dd22e27f7ecd09))
+* set checkout ref to release tag and tighten SemVer regex ([6296b22](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/6296b223ead8432ee63d9525dbb1879b6e1b3b52))
+
 ## [1.1.0](https://github.com/sujithq/gh-copilot-cli-model-switcher/compare/gh-copilot-byok-v1.0.0...gh-copilot-byok-v1.1.0) (2026-04-29)
 
 
