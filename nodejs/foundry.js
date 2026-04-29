@@ -7,9 +7,12 @@ function sanitizeProfilePart(value) {
 }
 
 function isApplicableAccount(account) {
-  const endpoint = (account && account.properties && account.properties.endpoint || '').toLowerCase();
+  const endpoint = ((account && account.endpoint) || (account && account.properties && account.properties.endpoint) || '').toLowerCase();
   const kind = (account && account.kind || '').toLowerCase();
-  return endpoint.includes('.openai.azure.com') || kind.includes('openai');
+  return endpoint.includes('.openai.azure.com')
+    || endpoint.includes('.cognitiveservices.azure.com')
+    || kind.includes('openai')
+    || kind === 'aiservices';
 }
 
 function mapDeployment(item) {

@@ -34,22 +34,42 @@ function withIsolatedConfigDir(t) {
   return tempDir;
 }
 
+function withoutConfigDirOverride(t) {
+  const previousDir = process.env.COPILOTX_CONFIG_DIR;
+
+  delete process.env.COPILOTX_CONFIG_DIR;
+
+  t.after(() => {
+    if (previousDir === undefined) {
+      delete process.env.COPILOTX_CONFIG_DIR;
+    } else {
+      process.env.COPILOTX_CONFIG_DIR = previousDir;
+    }
+  });
+}
+
 test('sanitizeSegment normalizes unsupported characters', () => {
   const value = config.__test.sanitizeSegment('User Name+Team@contoso.com');
   assert.equal(value, 'user_name_team@contoso.com');
 });
 
-test('resolveConfigFileFor uses global config when scope is global', () => {
+test('resolveConfigFileFor uses global config when scope is global', (t) => {
+  withoutConfigDirOverride(t);
+
   const pathValue = config.__test.resolveConfigFileFor('global', 'tenant__user');
   assert.match(pathValue, /[\\/]\.copilotx[\\/]config\.json$/);
 });
 
-test('resolveConfigFileFor uses user-scoped config when identity is present', () => {
+test('resolveConfigFileFor uses user-scoped config when identity is present', (t) => {
+  withoutConfigDirOverride(t);
+
   const pathValue = config.__test.resolveConfigFileFor('auto', 'tenant__user');
   assert.match(pathValue, /[\\/]\.copilotx[\\/]config\.tenant__user\.json$/);
 });
 
-test('resolveConfigFileFor falls back to global when identity is missing', () => {
+test('resolveConfigFileFor falls back to global when identity is missing', (t) => {
+  withoutConfigDirOverride(t);
+
   const pathValue = config.__test.resolveConfigFileFor('azure-user', null);
   assert.match(pathValue, /[\\/]\.copilotx[\\/]config\.json$/);
 });
@@ -114,6 +134,16 @@ test('mapDeployment falls back to deployment name when model metadata is missing
     modelName: 'gpt-4o-prod',
     modelVersion: ''
   });
+});
+
+test('isApplicableAccount accepts AIServices with flattened endpoint', () => {
+  const applicable = foundry.isApplicableAccount({
+    name: 'myfoundry',
+    kind: 'AIServices',
+    endpoint: 'https://myfoundry.cognitiveservices.azure.com/'
+  });
+
+  assert.equal(applicable, true);
 });
 
 test('buildUniqueProfileName appends suffix when base name already exists', () => {

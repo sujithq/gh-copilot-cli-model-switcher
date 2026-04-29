@@ -7,6 +7,21 @@ namespace CopilotX;
 
 class Program
 {
+    static string GetAzureCliCommand()
+    {
+        return OperatingSystem.IsWindows() ? "az.cmd" : "az";
+    }
+
+    static string EscapeMarkup(string value)
+    {
+        return Markup.Escape(value ?? string.Empty);
+    }
+
+    static string QuoteForCmd(string value)
+    {
+        return $"\"{(value ?? string.Empty).Replace("\"", "\\\"")}\"";
+    }
+
     static int Main(string[] args)
     {
         if (args.Length == 0)
@@ -215,7 +230,7 @@ class Program
 
         var startInfo = new ProcessStartInfo
         {
-            FileName = "az",
+            FileName = GetAzureCliCommand(),
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true
@@ -507,17 +522,34 @@ class Program
 
     static async Task<JsonDocument> RunAzJson(params string[] azArgs)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "az",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
+        ProcessStartInfo startInfo;
 
-        foreach (var arg in azArgs)
+        if (OperatingSystem.IsWindows())
         {
-            startInfo.ArgumentList.Add(arg);
+            var commandLine = string.Join(" ", new[] { "az" }.Concat(azArgs.Select(QuoteForCmd)));
+            startInfo = new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/d /s /c \"{commandLine}\"",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+        }
+        else
+        {
+            startInfo = new ProcessStartInfo
+            {
+                FileName = GetAzureCliCommand(),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            foreach (var arg in azArgs)
+            {
+                startInfo.ArgumentList.Add(arg);
+            }
         }
 
         var process = Process.Start(startInfo);
@@ -550,11 +582,18 @@ class Program
         JsonDocument doc;
         if (string.IsNullOrWhiteSpace(subscription))
         {
-            doc = await RunAzJson("cognitiveservices", "account", "list", "-o", "json");
+            doc = await RunAzJson(
+                "cognitiveservices", "account", "list",
+                "--query", "[].{name:name,resourceGroup:resourceGroup,kind:kind,endpoint:properties.endpoint}",
+                "-o", "json");
         }
         else
         {
-            doc = await RunAzJson("cognitiveservices", "account", "list", "--subscription", subscription, "-o", "json");
+            doc = await RunAzJson(
+                "cognitiveservices", "account", "list",
+                "--subscription", subscription,
+                "--query", "[].{name:name,resourceGroup:resourceGroup,kind:kind,endpoint:properties.endpoint}",
+                "-o", "json");
         }
 
         using (doc)
@@ -566,11 +605,7 @@ class Program
                 var resourceGroup = item.TryGetProperty("resourceGroup", out var rgProp) ? rgProp.GetString() ?? string.Empty : string.Empty;
                 var kind = item.TryGetProperty("kind", out var kindProp) ? kindProp.GetString() ?? string.Empty : string.Empty;
 
-                var endpoint = string.Empty;
-                if (item.TryGetProperty("properties", out var props) && props.TryGetProperty("endpoint", out var endpointProp))
-                {
-                    endpoint = endpointProp.GetString() ?? string.Empty;
-                }
+                var endpoint = item.TryGetProperty("endpoint", out var endpointProp) ? endpointProp.GetString() ?? string.Empty : string.Empty;
 
                 if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(resourceGroup))
                 {
@@ -633,6 +668,23 @@ class Program
 
     static async Task<int> ImportFoundryCommand(string[] args)
     {
+        if (args.Any(arg => arg is "--help" or "-h"))
+        {
+            AnsiConsole.MarkupLine("[bold]import-foundry[/]");
+            AnsiConsole.MarkupLine("Discover Foundry/Azure OpenAI deployments and add them as profiles.\n");
+            AnsiConsole.MarkupLine("[cyan]Options:[/]");
+            AnsiConsole.MarkupLine("  --account <name>           Limit import to one account");
+            AnsiConsole.MarkupLine("  --resource-group <name>    Resource group for --account");
+            AnsiConsole.MarkupLine("  --subscription <id|name>   Limit discovery to one subscription");
+            AnsiConsole.MarkupLine("  --mode each|all            Prompt per deployment or add all");
+            AnsiConsole.MarkupLine("  --all                      Add all discovered deployments without prompts\n");
+            AnsiConsole.MarkupLine("[cyan]Examples:[/]");
+            AnsiConsole.MarkupLine("  copilotx import-foundry --mode each");
+            AnsiConsole.MarkupLine("  copilotx import-foundry --all");
+            AnsiConsole.MarkupLine("  copilotx import-foundry --account myfoundry --resource-group my-rg --all");
+            return 0;
+        }
+
         var options = ParseOptions(args);
         options.TryGetValue("account", out var account);
         options.TryGetValue("resource-group", out var resourceGroup);
@@ -691,7 +743,7 @@ class Program
                 }
                 catch (Exception ex)
                 {
-                    AnsiConsole.MarkupLine($"[yellow]Skipping {foundryAccount.Name}: {ex.Message}[/]");
+                    AnsiConsole.MarkupLine($"[yellow]Skipping {EscapeMarkup(foundryAccount.Name)}: {EscapeMarkup(ex.Message)}[/]");
                     continue;
                 }
 
@@ -700,7 +752,7 @@ class Program
                     continue;
                 }
 
-                AnsiConsole.MarkupLine($"\n[bold]Account:[/] {foundryAccount.Name} ([dim]{foundryAccount.ResourceGroup}[/])");
+                AnsiConsole.MarkupLine($"\n[bold]Account:[/] {EscapeMarkup(foundryAccount.Name)} ([dim]{EscapeMarkup(foundryAccount.ResourceGroup)}[/])");
                 var endpoint = (string.IsNullOrWhiteSpace(foundryAccount.Endpoint)
                     ? $"https://{foundryAccount.Name}.openai.azure.com"
                     : foundryAccount.Endpoint).TrimEnd('/');
@@ -732,11 +784,11 @@ class Program
                     {
                         imported += 1;
                         existingNames.Add(profileName);
-                        AnsiConsole.MarkupLine($"  [green]Added[/] {profileName}");
+                        AnsiConsole.MarkupLine($"  [green]Added[/] {EscapeMarkup(profileName)}");
                     }
                     else
                     {
-                        AnsiConsole.MarkupLine($"  [red]Failed[/] {profileName}");
+                        AnsiConsole.MarkupLine($"  [red]Failed[/] {EscapeMarkup(profileName)}");
                     }
                 }
             }
@@ -746,7 +798,7 @@ class Program
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error importing Foundry profiles: {ex.Message}[/]");
+            AnsiConsole.MarkupLine($"[red]Error importing Foundry profiles: {EscapeMarkup(ex.Message)}[/]");
             AnsiConsole.MarkupLine("[dim]Ensure Azure CLI is installed and authenticated: az login[/]");
             return 1;
         }

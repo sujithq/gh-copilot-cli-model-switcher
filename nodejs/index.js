@@ -173,7 +173,15 @@ function runAzJson(args) {
 }
 
 async function listFoundryAccounts(subscription) {
-  const args = ['cognitiveservices', 'account', 'list', '-o', 'json'];
+  const args = [
+    'cognitiveservices',
+    'account',
+    'list',
+    '--query',
+    '[].{name:name,resourceGroup:resourceGroup,kind:kind,endpoint:properties.endpoint}',
+    '-o',
+    'json'
+  ];
   if (subscription) {
     args.push('--subscription', subscription);
   }
@@ -243,7 +251,7 @@ async function importFoundryProfiles(options) {
     for (const account of accounts) {
       const accountName = account.name;
       const resourceGroup = account.resourceGroup;
-      const endpoint = (account.properties?.endpoint || `https://${accountName}.openai.azure.com`).replace(/\/$/, '');
+      const endpoint = ((account.endpoint) || `https://${accountName}.openai.azure.com`).replace(/\/$/, '');
 
       if (!resourceGroup) {
         console.warn(`Skipping account ${accountName}: resource group not found.`);
