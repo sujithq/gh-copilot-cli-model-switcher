@@ -53,14 +53,14 @@ npm test
 
 Uses Node's built-in test runner (`node --test`).
 
-### .NET unit tests (Microsoft Testing Platform)
+### .NET unit tests (xUnit)
 
 ```bash
 cd dotnet/CopilotX.Tests
-dotnet test
+dotnet run
 ```
 
-The `.NET` test project uses MSTest with `UseMicrosoftTestingPlatformRunner=true`.
+The `.NET` test project uses xUnit with a lightweight console test runner.
 
 ### .NET Version
 

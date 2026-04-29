@@ -19,9 +19,9 @@ cd dotnet/CopilotX && dotnet pack && dotnet tool install --global --add-source .
 cd nodejs && npm test
 ```
 
-### .NET (Microsoft Testing Platform)
+### .NET (xUnit)
 ```bash
-cd dotnet/CopilotX.Tests && dotnet test
+cd dotnet/CopilotX.Tests && dotnet run
 ```
 
 ## Commands
