@@ -184,6 +184,19 @@ test('mapDeployment falls back to deployment name when model metadata is missing
   });
 });
 
+test('isChatCapableDeployment accepts chat and rejects embeddings', () => {
+  const chat = foundry.isChatCapableDeployment({
+    properties: { capabilities: { chatCompletion: 'true' }, model: { name: 'gpt-4.1' } }
+  });
+
+  const embedding = foundry.isChatCapableDeployment({
+    properties: { capabilities: { embeddings: 'true' }, model: { name: 'text-embedding-ada-002' } }
+  });
+
+  assert.equal(chat, true);
+  assert.equal(embedding, false);
+});
+
 test('isApplicableAccount accepts AIServices with flattened endpoint', () => {
   const applicable = foundry.isApplicableAccount({
     name: 'myfoundry',

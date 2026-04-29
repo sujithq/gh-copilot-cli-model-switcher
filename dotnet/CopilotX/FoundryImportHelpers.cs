@@ -62,6 +62,46 @@ internal static class FoundryImportHelpers
         };
     }
 
+    internal static bool IsChatCapableDeployment(JsonElement item)
+    {
+        if (item.TryGetProperty("properties", out var properties)
+            && properties.TryGetProperty("capabilities", out var capabilities)
+            && capabilities.ValueKind == JsonValueKind.Object)
+        {
+            if (capabilities.TryGetProperty("chatCompletion", out var chatProp)
+                && string.Equals(chatProp.GetString(), "true", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (capabilities.TryGetProperty("responses", out var responsesProp)
+                && string.Equals(responsesProp.GetString(), "true", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        // Fallback when capabilities are absent: exclude known embedding models.
+        var modelName = string.Empty;
+        if (item.TryGetProperty("properties", out var props)
+            && props.TryGetProperty("model", out var model)
+            && model.TryGetProperty("name", out var modelNameProp))
+        {
+            modelName = modelNameProp.GetString() ?? string.Empty;
+        }
+        else if (item.TryGetProperty("model", out var rootModel)
+            && rootModel.TryGetProperty("name", out var rootModelNameProp))
+        {
+            modelName = rootModelNameProp.GetString() ?? string.Empty;
+        }
+        else if (item.TryGetProperty("name", out var deploymentNameProp))
+        {
+            modelName = deploymentNameProp.GetString() ?? string.Empty;
+        }
+
+        return !modelName.Contains("embedding", StringComparison.OrdinalIgnoreCase);
+    }
+
     internal static string BuildUniqueProfileName(string accountName, string deploymentName, IEnumerable<string> existingNames)
     {
         var baseName = $"foundry-{SanitizeProfilePart(accountName)}-{SanitizeProfilePart(deploymentName)}";
