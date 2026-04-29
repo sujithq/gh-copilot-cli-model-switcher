@@ -310,6 +310,7 @@ npm test
 ```
 
 Current tests cover deterministic config path resolution and identity-scoped config behavior.
+They also cover file persistence in isolated temp config directories, profile upsert behavior, and last-used persistence.
 
 ## License
 

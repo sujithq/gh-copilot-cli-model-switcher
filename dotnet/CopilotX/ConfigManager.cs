@@ -45,10 +45,15 @@ public class Config
 
 public class ConfigManager
 {
-    private static readonly string ConfigDir = Path.Combine(
+    private static readonly string DefaultConfigDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".copilotx"
     );
+
+    private static string GetConfigDir()
+    {
+        return Environment.GetEnvironmentVariable("COPILOTX_CONFIG_DIR") ?? DefaultConfigDir;
+    }
 
     private static string SanitizeSegment(string value)
     {
@@ -142,9 +147,10 @@ public class ConfigManager
 
     private static string ResolveConfigFile()
     {
+        var configDir = GetConfigDir();
         var scope = (Environment.GetEnvironmentVariable("COPILOTX_CONFIG_SCOPE") ?? "auto").ToLowerInvariant();
         var identityKey = GetAzureIdentityKey();
-        return ResolveConfigFileFor(ConfigDir, scope, identityKey);
+        return ResolveConfigFileFor(configDir, scope, identityKey);
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -169,9 +175,10 @@ public class ConfigManager
 
     public static void EnsureConfigDir()
     {
-        if (!Directory.Exists(ConfigDir))
+        var configDir = GetConfigDir();
+        if (!Directory.Exists(configDir))
         {
-            Directory.CreateDirectory(ConfigDir);
+            Directory.CreateDirectory(configDir);
         }
     }
 

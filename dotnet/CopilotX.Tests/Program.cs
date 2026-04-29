@@ -5,7 +5,7 @@ namespace CopilotX.Tests;
 
 public static class Program
 {
-    public static int Main()
+    public static async Task<int> Main()
     {
         var assembly = Assembly.GetExecutingAssembly();
         var factAttribute = typeof(FactAttribute);
@@ -23,10 +23,17 @@ public static class Program
 
         foreach (var (type, method) in testMethods)
         {
+            object? instance = null;
             try
             {
-                var instance = Activator.CreateInstance(type);
-                method.Invoke(instance, null);
+                instance = Activator.CreateInstance(type);
+                var result = method.Invoke(instance, null);
+
+                if (result is Task task)
+                {
+                    await task;
+                }
+
                 Console.WriteLine($"PASS {type.Name}.{method.Name}");
                 passed++;
             }
@@ -38,6 +45,13 @@ public static class Program
 
                 Console.WriteLine($"FAIL {type.Name}.{method.Name}: {actual.Message}");
                 failed++;
+            }
+            finally
+            {
+                if (instance is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
             }
         }
 
