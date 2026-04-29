@@ -97,7 +97,7 @@ function loadConfig() {
 
   if (!fs.existsSync(configFile)) {
     saveConfig(DEFAULT_CONFIG);
-    return DEFAULT_CONFIG;
+    return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
   }
 
   try {
@@ -105,7 +105,7 @@ function loadConfig() {
     return JSON.parse(data);
   } catch (error) {
     console.error('Error loading config:', error.message);
-    return DEFAULT_CONFIG;
+    return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
   }
 }
 

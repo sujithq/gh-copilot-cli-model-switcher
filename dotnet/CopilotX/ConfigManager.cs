@@ -226,18 +226,18 @@ public class ConfigManager
         if (!File.Exists(configFile))
         {
             SaveConfig(DefaultConfig);
-            return DefaultConfig;
+            return JsonSerializer.Deserialize<Config>(JsonSerializer.Serialize(DefaultConfig, JsonOptions), JsonOptions)!;
         }
 
         try
         {
             var json = File.ReadAllText(configFile);
-            return JsonSerializer.Deserialize<Config>(json, JsonOptions) ?? DefaultConfig;
+            return JsonSerializer.Deserialize<Config>(json, JsonOptions) ?? JsonSerializer.Deserialize<Config>(JsonSerializer.Serialize(DefaultConfig, JsonOptions), JsonOptions)!;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error loading config: {ex.Message}");
-            return DefaultConfig;
+            return JsonSerializer.Deserialize<Config>(JsonSerializer.Serialize(DefaultConfig, JsonOptions), JsonOptions)!;
         }
     }
 
