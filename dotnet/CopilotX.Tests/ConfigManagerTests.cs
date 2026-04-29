@@ -12,18 +12,18 @@ public class ConfigManagerTests : IDisposable
 
     public ConfigManagerTests()
     {
-        _tempConfigDir = Path.Combine(Path.GetTempPath(), $"copilotx-dotnet-test-{Guid.NewGuid():N}");
-        _previousScope = Environment.GetEnvironmentVariable("COPILOTX_CONFIG_SCOPE");
-        _previousConfigDir = Environment.GetEnvironmentVariable("COPILOTX_CONFIG_DIR");
+        _tempConfigDir = Path.Combine(Path.GetTempPath(), $"gh-copilot-byok-dotnet-test-{Guid.NewGuid():N}");
+        _previousScope = Environment.GetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_SCOPE");
+        _previousConfigDir = Environment.GetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_DIR");
 
-        Environment.SetEnvironmentVariable("COPILOTX_CONFIG_SCOPE", "global");
-        Environment.SetEnvironmentVariable("COPILOTX_CONFIG_DIR", _tempConfigDir);
+        Environment.SetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_SCOPE", "global");
+        Environment.SetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_DIR", _tempConfigDir);
     }
 
     public void Dispose()
     {
-        Environment.SetEnvironmentVariable("COPILOTX_CONFIG_SCOPE", _previousScope);
-        Environment.SetEnvironmentVariable("COPILOTX_CONFIG_DIR", _previousConfigDir);
+        Environment.SetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_SCOPE", _previousScope);
+        Environment.SetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_DIR", _previousConfigDir);
 
         if (Directory.Exists(_tempConfigDir))
         {
@@ -34,25 +34,25 @@ public class ConfigManagerTests : IDisposable
     [Fact]
     public void ResolveConfigFileFor_UsesGlobalWhenScopeGlobal()
     {
-        var path = ConfigManager.ResolveConfigFileFor("/tmp/copilotx", "global", "tenant__user");
+        var path = ConfigManager.ResolveConfigFileFor("/tmp/gh-copilot-byok", "global", "tenant__user");
 
-        Assert.Equal("/tmp/copilotx/config.json", path.Replace('\\', '/'));
+        Assert.Equal("/tmp/gh-copilot-byok/config.json", path.Replace('\\', '/'));
     }
 
     [Fact]
     public void ResolveConfigFileFor_UsesAzureUserScopedWhenIdentityPresent()
     {
-        var path = ConfigManager.ResolveConfigFileFor("/tmp/copilotx", "auto", "tenant123__user_contoso.com");
+        var path = ConfigManager.ResolveConfigFileFor("/tmp/gh-copilot-byok", "auto", "tenant123__user_contoso.com");
 
-        Assert.Equal("/tmp/copilotx/config.tenant123__user_contoso.com.json", path.Replace('\\', '/'));
+        Assert.Equal("/tmp/gh-copilot-byok/config.tenant123__user_contoso.com.json", path.Replace('\\', '/'));
     }
 
     [Fact]
     public void ResolveConfigFileFor_FallsBackToGlobalWhenIdentityMissing()
     {
-        var path = ConfigManager.ResolveConfigFileFor("/tmp/copilotx", "azure-user", null);
+        var path = ConfigManager.ResolveConfigFileFor("/tmp/gh-copilot-byok", "azure-user", null);
 
-        Assert.Equal("/tmp/copilotx/config.json", path.Replace('\\', '/'));
+        Assert.Equal("/tmp/gh-copilot-byok/config.json", path.Replace('\\', '/'));
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public class ConfigManagerTests : IDisposable
         Assert.Equal("foundry-myfoundry-gpt-4o-prod", profile.Name);
         Assert.Equal("byok", profile.Type);
         Assert.Equal("https://myfoundry.openai.azure.com/openai/deployments/gpt-4o-prod", profile.BaseUrl);
-        Assert.Equal("gpt-4o", profile.Model);
+        Assert.Equal("gpt-4o-prod", profile.Model);
         Assert.Equal("azure", profile.ProviderType);
         Assert.Equal("auto", profile.AzureCliToken);
         Assert.Equal("https://cognitiveservices.azure.com/.default", profile.TokenScope);

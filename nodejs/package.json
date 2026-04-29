@@ -1,10 +1,10 @@
 {
-  "name": "copilotx",
+  "name": "gh-copilot-byok",
   "version": "1.0.0",
   "description": "A lightweight CLI wrapper around GitHub Copilot CLI for easy model switching",
   "main": "index.js",
   "bin": {
-    "copilotx": "./index.js"
+    "gh-copilot-byok": "./index.js"
   },
   "scripts": {
     "test": "node --test"

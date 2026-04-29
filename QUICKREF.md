@@ -1,4 +1,4 @@
-# CopilotX Quick Reference
+# gh-copilot-byok Quick Reference
 
 ## Installation
 
@@ -9,7 +9,7 @@ cd nodejs && npm install && npm link
 
 ### .NET
 ```bash
-cd dotnet/CopilotX && dotnet pack && dotnet tool install --global --add-source ./nupkg CopilotX
+cd dotnet/CopilotX && dotnet pack && dotnet tool install --global --add-source ./nupkg gh-copilot-byok
 ```
 
 ## Testing
@@ -33,13 +33,13 @@ cd dotnet/CopilotX.Tests && dotnet run
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `copilotx list` | Show profiles with interactive selection menu | `copilotx list` → Enter profile # |
-| `copilotx use <profile>` | Use specific profile | `copilotx use azure-gpt4` |
-| `copilotx last` | Use last profile | `copilotx last` |
-| `copilotx default` | Use default Copilot | `copilotx default` |
-| `copilotx add` | Add new profile | `copilotx add` |
-| `copilotx import-foundry` | Import from Foundry deployments | `copilotx import-foundry --mode each` |
-| `copilotx help` | Show help | `copilotx help` |
+| `gh-copilot-byok list` | Show profiles with interactive selection menu | `gh-copilot-byok list` → Enter profile # |
+| `gh-copilot-byok use <profile>` | Use specific profile | `gh-copilot-byok use azure-gpt4` |
+| `gh-copilot-byok last` | Use last profile | `gh-copilot-byok last` |
+| `gh-copilot-byok default` | Use default Copilot | `gh-copilot-byok default` |
+| `gh-copilot-byok add` | Add new profile | `gh-copilot-byok add` |
+| `gh-copilot-byok import-foundry` | Import from Foundry deployments | `gh-copilot-byok import-foundry --mode each` |
+| `gh-copilot-byok help` | Show help | `gh-copilot-byok help` |
 
 ## Profile Types
 
@@ -121,7 +121,7 @@ export OPENAI_API_KEY="sk-..."
 export APIM_KEY="your-key"
 ```
 
-For keyless Azure profiles, CopilotX uses Azure CLI:
+For keyless Azure profiles, gh-copilot-byok uses Azure CLI:
 ```bash
 az login
 az account get-access-token --scope https://cognitiveservices.azure.com/.default
@@ -135,46 +135,46 @@ Auth toggle fields:
 
 ### Switch Models
 ```bash
-copilotx use azure-gpt4
-copilotx use openai
-copilotx use ollama
+gh-copilot-byok use azure-gpt4
+gh-copilot-byok use openai
+gh-copilot-byok use ollama
 ```
 
 ### With Commands
 ```bash
-copilotx use azure-gpt4 suggest "create a function"
-copilotx use ollama explain "what does this do"
-copilotx last suggest "another question"
+gh-copilot-byok use azure-gpt4 suggest "create a function"
+gh-copilot-byok use ollama explain "what does this do"
+gh-copilot-byok last suggest "another question"
 ```
 
 ### Quick Access
 ```bash
 # Set preferred profile
-copilotx use azure-gpt4
+gh-copilot-byok use azure-gpt4
 
 # Use it repeatedly
-copilotx last suggest "..."
-copilotx last explain "..."
+gh-copilot-byok last suggest "..."
+gh-copilot-byok last explain "..."
 ```
 
 ### Import Foundry Deployments
 ```bash
 # Prompt for each discovered deployment
-copilotx import-foundry --mode each
+gh-copilot-byok import-foundry --mode each
 
 # Add all discovered deployments
-copilotx import-foundry --all
+gh-copilot-byok import-foundry --all
 
 # Import from one account/resource group
-copilotx import-foundry --account myfoundry --resource-group my-rg --all
+gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all
 ```
 
 ## Files
 
-- **Config (active)**: shown by `copilotx list`
-- **Global config**: `~/.copilotx/config.json`
-- **Azure user-scoped config**: `~/.copilotx/config.<tenantId>__<userName>.json`
-- **Scope override**: `COPILOTX_CONFIG_SCOPE=auto|azure-user|global`
+- **Config (active)**: shown by `gh-copilot-byok list`
+- **Global config**: `~/.gh-copilot-byok/config.json`
+- **Azure user-scoped config**: `~/.gh-copilot-byok/config.<tenantId>__<userName>.json`
+- **Scope override**: `GH_COPILOT_BYOK_CONFIG_SCOPE=auto|azure-user|global`
 - **Node.js**: `/nodejs`
 - **.NET**: `/dotnet/CopilotX`
 - **Examples**: `/examples`
@@ -183,7 +183,7 @@ copilotx import-foundry --account myfoundry --resource-group my-rg --all
 
 ### Profile not found
 ```bash
-copilotx list  # Check available profiles
+gh-copilot-byok list  # Check available profiles
 ```
 
 ### API key missing
