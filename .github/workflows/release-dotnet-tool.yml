@@ -1,0 +1,60 @@
+name: Release .NET Tool
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish:
+    name: Publish to GitHub Packages
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_PATH: dotnet/CopilotX/CopilotX.csproj
+      TEST_PROJECT_PATH: dotnet/CopilotX.Tests/CopilotX.Tests.csproj
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore $PROJECT_PATH --nologo
+
+      - name: Build
+        run: dotnet build $PROJECT_PATH -c Release --no-restore --nologo
+
+      - name: Test
+        run: dotnet run --project $TEST_PROJECT_PATH -c Release --nologo
+
+      - name: Pack
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          dotnet pack $PROJECT_PATH -c Release --no-build --nologo /p:Version=$VERSION
+
+      - name: Push package to GitHub Packages (NuGet)
+        env:
+          OWNER: ${{ github.repository_owner }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dotnet nuget push dotnet/CopilotX/nupkg/*.nupkg \
+            --api-key "$GITHUB_TOKEN" \
+            --source "https://nuget.pkg.github.com/$OWNER/index.json" \
+            --skip-duplicate
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          append_body: false
+          files: |
+            dotnet/CopilotX/nupkg/*.nupkg

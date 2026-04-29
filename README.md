@@ -77,6 +77,18 @@ dotnet tool install --global --add-source ./nupkg gh-copilot-byok
 gh-copilot-byok list
 ```
 
+### Install from GitHub Packages (NuGet feed) after first release
+
+```bash
+dotnet tool install --global gh-copilot-byok --add-source "https://nuget.pkg.github.com/sujithq/index.json"
+```
+
+Update an existing installation:
+
+```bash
+dotnet tool update --global gh-copilot-byok --add-source "https://nuget.pkg.github.com/sujithq/index.json"
+```
+
 ## 🎮 Usage
 
 All commands are identical across both implementations:
@@ -107,6 +119,39 @@ gh-copilot-byok import-foundry --all
 # Import from one account/resource group
 gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all
 ```
+
+## 🚢 Release Readiness
+
+This repository now includes CI and release automation:
+
+- `.github/workflows/ci.yml`
+  - Runs Node tests
+  - Runs .NET build/tests
+  - Validates .NET packing
+- `.github/workflows/release-dotnet-tool.yml`
+  - Triggered when a GitHub release is published
+  - Builds/tests/packs
+  - Publishes to GitHub Packages NuGet feed
+  - Uploads package artifacts to the published GitHub Release
+- `.github/workflows/release-please.yml`
+  - Generates semantic version bumps and release notes via Release Please
+  - Opens/updates release PRs from conventional commits
+
+Release guide: [RELEASING.md](RELEASING.md)
+
+### Conventional Commits (SemVer)
+
+Release Please determines version bumps from commit messages:
+
+- `fix:` -> patch bump (x.y.Z)
+- `feat:` -> minor bump (x.Y.0)
+- `feat!:` or `BREAKING CHANGE:` -> major bump (X.0.0)
+
+Examples:
+
+- `fix(node): handle null mcp list`
+- `feat(dotnet): add mcp-compat command`
+- `feat!: drop legacy config format`
 
 ## 🧱 Core Concepts
 

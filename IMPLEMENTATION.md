@@ -282,7 +282,7 @@ The tools are ready for:
 1. User testing and feedback
 2. Additional features as needed
 3. Shell completion scripts
-4. Package distribution (npm, NuGet)
+4. Package distribution (npm, GitHub Packages NuGet feed)
 5. CI/CD integration
 
 ## 📝 Notes
