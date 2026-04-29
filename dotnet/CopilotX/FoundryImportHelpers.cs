@@ -92,7 +92,8 @@ internal static class FoundryImportHelpers
             Name = BuildUniqueProfileName(accountName, deployment.DeploymentName, existingNames),
             Type = "byok",
             BaseUrl = $"{normalizedEndpoint}/openai/deployments/{deployment.DeploymentName}",
-            Model = deployment.ModelName,
+            // For Azure OpenAI BYOK, COPILOT_MODEL must match deployment name.
+            Model = deployment.DeploymentName,
             ProviderType = "azure",
             AzureCliToken = "auto",
             TokenScope = "https://cognitiveservices.azure.com/.default"

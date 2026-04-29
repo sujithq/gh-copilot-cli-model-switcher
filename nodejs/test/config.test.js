@@ -171,7 +171,7 @@ test('buildImportedProfile creates azure token-based profile for deployment', ()
     name: 'foundry-myfoundry-gpt-4o-prod',
     type: 'byok',
     baseUrl: 'https://myfoundry.openai.azure.com/openai/deployments/gpt-4o-prod',
-    model: 'gpt-4o',
+    model: 'gpt-4o-prod',
     providerType: 'azure',
     azureCliToken: 'auto',
     tokenScope: 'https://cognitiveservices.azure.com/.default'

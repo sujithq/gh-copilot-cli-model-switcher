@@ -483,6 +483,14 @@ class Program
         return baseUrl.Contains(".openai.azure.com") || providerType == "azure";
     }
 
+    static string GetAzureDeploymentFromBaseUrl(string? baseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(baseUrl)) return string.Empty;
+        var match = Regex.Match(baseUrl, @"/openai/deployments/([^/?#]+)", RegexOptions.IgnoreCase);
+        if (!match.Success) return string.Empty;
+        return Uri.UnescapeDataString(match.Groups[1].Value);
+    }
+
     static bool ShouldUseAzureCliToken(Profile profile, bool hasApiKey)
     {
         var mode = (profile.AzureCliToken ?? "auto").ToLowerInvariant();
@@ -584,7 +592,20 @@ class Program
 
             if (!string.IsNullOrEmpty(profile.Model))
             {
-                Environment.SetEnvironmentVariable("COPILOT_MODEL", profile.Model);
+                var modelForProvider = profile.Model;
+                if (IsAzureProfile(profile))
+                {
+                    var deploymentName = GetAzureDeploymentFromBaseUrl(profile.BaseUrl);
+                    if (!string.IsNullOrWhiteSpace(deploymentName)
+                        && !string.Equals(modelForProvider, deploymentName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Azure BYOK providers expect the deployment identifier as COPILOT_MODEL.
+                        modelForProvider = deploymentName;
+                        AnsiConsole.MarkupLine($"[dim]Using Azure deployment name '{EscapeMarkup(deploymentName)}' as model for provider compatibility.[/]");
+                    }
+                }
+
+                Environment.SetEnvironmentVariable("COPILOT_MODEL", modelForProvider);
             }
 
             string? resolvedApiKey = null;
