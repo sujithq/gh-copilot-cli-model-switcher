@@ -82,7 +82,8 @@ copilotx list
 All commands are identical across both implementations:
 
 ```bash
-# List available profiles
+# List available profiles (interactive menu: select #, then press Enter to use)
+copilotx list
 copilotx list
 
 # Use a specific profile

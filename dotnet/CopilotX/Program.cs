@@ -87,19 +87,23 @@ class Program
         AnsiConsole.MarkupLine("[bold blue]Available profiles:[/]\n");
 
         var table = new Table();
+        table.AddColumn("#");
         table.AddColumn("");
         table.AddColumn("Name");
         table.AddColumn("Type");
         table.AddColumn("Base URL");
         table.AddColumn("Model");
 
-        foreach (var profile in profiles)
+        var profileList = profiles.ToList();
+        for (int i = 0; i < profileList.Count; i++)
         {
+            var profile = profileList[i];
             var marker = profile.Name == lastUsed ? "[green]*[/]" : " ";
             var baseUrl = profile.BaseUrl ?? "N/A";
             var model = profile.Model ?? "N/A";
 
             table.AddRow(
+                $"[dim]{i + 1}[/]",
                 marker,
                 $"[cyan]{profile.Name}[/]",
                 profile.Type,
@@ -112,6 +116,28 @@ class Program
 
         AnsiConsole.MarkupLine("\n[dim]* = last used[/]");
         AnsiConsole.MarkupLine($"[dim]Config file: {ConfigManager.GetConfigFile()}[/]");
+
+        // Prompt to select a profile (only if stdin is interactive)
+        if (profileList.Count > 0 && Console.IsInputRedirected == false)
+        {
+            AnsiConsole.MarkupLine("");
+            while (true)
+            {
+                var input = AnsiConsole.Ask<string>("[yellow]Select profile # (or press Enter to exit):[/] ").Trim();
+                if (string.IsNullOrEmpty(input))
+                {
+                    break;
+                }
+
+                if (int.TryParse(input, out var selection) && selection > 0 && selection <= profileList.Count)
+                {
+                    var selectedProfile = profileList[selection - 1];
+                    return UseCommand(new[] { selectedProfile.Name });
+                }
+
+                AnsiConsole.MarkupLine("[red]Invalid selection. Please try again.[/]");
+            }
+        }
 
         return 0;
     }
@@ -228,22 +254,39 @@ class Program
             ? "https://cognitiveservices.azure.com/.default"
             : profile.TokenScope;
 
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = GetAzureCliCommand(),
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
+        ProcessStartInfo startInfo;
 
-        startInfo.ArgumentList.Add("account");
-        startInfo.ArgumentList.Add("get-access-token");
-        startInfo.ArgumentList.Add("--scope");
-        startInfo.ArgumentList.Add(scope);
-        startInfo.ArgumentList.Add("--query");
-        startInfo.ArgumentList.Add("accessToken");
-        startInfo.ArgumentList.Add("-o");
-        startInfo.ArgumentList.Add("tsv");
+        if (OperatingSystem.IsWindows())
+        {
+            var commandLine = string.Join(" ", new[] { "az", "account", "get-access-token", "--scope", QuoteForCmd(scope), "--query", "accessToken", "-o", "tsv" });
+            startInfo = new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/d /s /c \"{commandLine}\"",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+        }
+        else
+        {
+            startInfo = new ProcessStartInfo
+            {
+                FileName = GetAzureCliCommand(),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            startInfo.ArgumentList.Add("account");
+            startInfo.ArgumentList.Add("get-access-token");
+            startInfo.ArgumentList.Add("--scope");
+            startInfo.ArgumentList.Add(scope);
+            startInfo.ArgumentList.Add("--query");
+            startInfo.ArgumentList.Add("accessToken");
+            startInfo.ArgumentList.Add("-o");
+            startInfo.ArgumentList.Add("tsv");
+        }
 
         var process = Process.Start(startInfo);
         if (process == null)

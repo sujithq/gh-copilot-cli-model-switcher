@@ -33,7 +33,7 @@ cd dotnet/CopilotX.Tests && dotnet run
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `copilotx list` | Show all profiles | `copilotx list` |
+| `copilotx list` | Show profiles with interactive selection menu | `copilotx list` → Enter profile # |
 | `copilotx use <profile>` | Use specific profile | `copilotx use azure-gpt4` |
 | `copilotx last` | Use last profile | `copilotx last` |
 | `copilotx default` | Use default Copilot | `copilotx default` |

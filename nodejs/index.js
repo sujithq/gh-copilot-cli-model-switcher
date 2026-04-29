@@ -19,6 +19,25 @@ const {
   getConfigFile
 } = require('./config');
 
+function promptForSelection(message, maxOption) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    rl.question(message, (answer) => {
+      rl.close();
+      const selection = parseInt(answer, 10);
+      if (!isNaN(selection) && selection > 0 && selection <= maxOption) {
+        resolve(selection);
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
 function isAzureProfile(profile) {
   const baseUrl = (profile.baseUrl || '').toLowerCase();
   const providerType = (profile.providerType || '').toLowerCase();
@@ -395,16 +414,16 @@ const argv = yargs(hideBin(process.argv))
     'list',
     'List all available profiles',
     () => {},
-    () => {
+    async (argv) => {
       const profiles = listProfiles();
       const lastUsed = getLastUsed();
 
       console.log('Available profiles:');
       console.log('');
 
-      profiles.forEach(profile => {
+      profiles.forEach((profile, index) => {
         const marker = profile.name === lastUsed ? '* ' : '  ';
-        console.log(`${marker}${profile.name} (${profile.type})`);
+        console.log(`${index + 1}. ${marker}${profile.name} (${profile.type})`);
 
         if (profile.type === 'byok' || profile.type === 'proxy') {
           console.log(`    Base URL: ${profile.baseUrl || 'N/A'}`);
@@ -419,6 +438,16 @@ const argv = yargs(hideBin(process.argv))
 
       console.log(`* = last used`);
       console.log(`\nConfig file: ${getConfigFile()}`);
+
+      // Prompt to select a profile
+      if (profiles.length > 0) {
+        const selection = await promptForSelection('\nSelect profile # (or press Enter to exit): ', profiles.length);
+        if (selection) {
+          const selectedProfile = profiles[selection - 1];
+          const code = await executeWithProfile(selectedProfile.name, []);
+          process.exit(code);
+        }
+      }
     }
   )
   .command(
