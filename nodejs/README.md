@@ -14,7 +14,7 @@ This will make the `gh-copilot-byok` command available globally.
 
 ## Prerequisites
 
-- Node.js 14 or higher
+- Node.js 18 or higher
 - GitHub Copilot CLI installed: `gh extension install github/gh-copilot`
 
 ## Usage
