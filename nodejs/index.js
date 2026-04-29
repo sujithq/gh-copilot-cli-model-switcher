@@ -104,6 +104,7 @@ async function setEnvironmentForProfile(profile) {
   if (profile.type === 'copilot') {
     delete process.env.COPILOT_PROVIDER_BASE_URL;
     delete process.env.COPILOT_PROVIDER_API_KEY;
+    delete process.env.COPILOT_PROVIDER_BEARER_TOKEN;
     delete process.env.COPILOT_MODEL;
     delete process.env.COPILOT_PROVIDER_TYPE;
     return { usedAzureCliToken: false };
@@ -133,10 +134,13 @@ async function setEnvironmentForProfile(profile) {
     if (useAzureCliToken) {
       const token = await getAzureCliToken(profile);
       process.env.COPILOT_PROVIDER_API_KEY = token;
+      process.env.COPILOT_PROVIDER_BEARER_TOKEN = token;
     } else if (resolvedApiKey) {
       process.env.COPILOT_PROVIDER_API_KEY = resolvedApiKey;
+      delete process.env.COPILOT_PROVIDER_BEARER_TOKEN;
     } else {
       delete process.env.COPILOT_PROVIDER_API_KEY;
+      delete process.env.COPILOT_PROVIDER_BEARER_TOKEN;
     }
 
     if (profile.providerType) {
@@ -401,6 +405,7 @@ async function executeWithProfile(profileName, copilotArgs = []) {
       console.warn('Detected token-related auth failure. Refreshing Azure CLI token and retrying once...');
       const refreshedToken = await getAzureCliToken(profile);
       process.env.COPILOT_PROVIDER_API_KEY = refreshedToken;
+      process.env.COPILOT_PROVIDER_BEARER_TOKEN = refreshedToken;
       result = await runCopilot(copilotArgs);
     }
 
