@@ -1,0 +1,38 @@
+{
+  "profiles": [
+    {
+      "name": "default",
+      "type": "copilot",
+      "model": "auto"
+    },
+    {
+      "name": "azure-gpt4",
+      "type": "byok",
+      "baseUrl": "https://your-resource.openai.azure.com/openai/deployments/gpt-4",
+      "apiKeyEnv": "AZURE_OPENAI_KEY",
+      "model": "gpt-4"
+    },
+    {
+      "name": "ollama-llama3",
+      "type": "byok",
+      "baseUrl": "http://localhost:11434/v1",
+      "model": "llama3"
+    },
+    {
+      "name": "openai-gpt4",
+      "type": "byok",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "model": "gpt-4"
+    },
+    {
+      "name": "azure-proxy",
+      "type": "proxy",
+      "baseUrl": "https://your-apim.azure-api.net",
+      "apiKeyEnv": "APIM_SUBSCRIPTION_KEY",
+      "model": "gpt-4",
+      "providerType": "azure"
+    }
+  ],
+  "lastUsed": "default"
+}
