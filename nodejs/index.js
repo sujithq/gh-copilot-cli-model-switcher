@@ -5,6 +5,12 @@ const { hideBin } = require('yargs/helpers');
 const { spawn } = require('child_process');
 const readline = require('readline');
 const {
+  sanitizeProfilePart,
+  isApplicableAccount,
+  mapDeployment,
+  buildImportedProfile
+} = require('./foundry');
+const {
   getProfile,
   addProfile,
   listProfiles,
@@ -128,14 +134,6 @@ function isTokenFailure(text) {
   return /(401|unauthorized|forbidden|invalid token|token expired|expired token|authentication failed|permission denied)/i.test(text || '');
 }
 
-function sanitizeProfilePart(value) {
-  return (value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
 function askQuestion(rl, prompt) {
   return new Promise((resolve) => rl.question(prompt, resolve));
 }
@@ -181,11 +179,7 @@ async function listFoundryAccounts(subscription) {
   }
 
   const accounts = await runAzJson(args);
-  return accounts.filter((account) => {
-    const endpoint = (account.properties?.endpoint || '').toLowerCase();
-    const kind = (account.kind || '').toLowerCase();
-    return endpoint.includes('.openai.azure.com') || kind.includes('openai');
-  });
+  return accounts.filter(isApplicableAccount);
 }
 
 async function listAccountDeployments(accountName, resourceGroup, subscription) {
@@ -207,11 +201,7 @@ async function listAccountDeployments(accountName, resourceGroup, subscription) 
   }
 
   const deployments = await runAzJson(args);
-  return deployments.map((item) => ({
-    deploymentName: item.name,
-    modelName: item.properties?.model?.name || item.model?.name || item.name,
-    modelVersion: item.properties?.model?.version || item.model?.version || '',
-  }));
+  return deployments.map(mapDeployment).filter((item) => item.deploymentName);
 }
 
 async function importFoundryProfiles(options) {
@@ -248,6 +238,7 @@ async function importFoundryProfiles(options) {
 
     let importedCount = 0;
     let scannedDeployments = 0;
+    const existingNames = new Set(listProfiles().map((profile) => profile.name));
 
     for (const account of accounts) {
       const accountName = account.name;
@@ -291,20 +282,12 @@ async function importFoundryProfiles(options) {
           continue;
         }
 
-        const profileName = `foundry-${sanitizeProfilePart(accountName)}-${sanitizeProfilePart(dep.deploymentName)}`;
-
-        const profile = {
-          name: profileName,
-          type: 'byok',
-          baseUrl: `${endpoint}/openai/deployments/${dep.deploymentName}`,
-          model: dep.modelName,
-          providerType: 'azure',
-          azureCliToken: 'auto',
-          tokenScope: 'https://cognitiveservices.azure.com/.default'
-        };
+        const profile = buildImportedProfile(accountName, endpoint, dep, existingNames);
+        const profileName = profile.name;
 
         if (addProfile(profile)) {
           importedCount += 1;
+          existingNames.add(profileName);
           console.log(`  Added profile: ${profileName}`);
         } else {
           console.warn(`  Failed to add profile: ${profileName}`);

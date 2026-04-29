@@ -505,22 +505,6 @@ class Program
         return options;
     }
 
-    static string SanitizeProfilePart(string value)
-    {
-        var chars = value
-            .ToLowerInvariant()
-            .Select(ch => char.IsLetterOrDigit(ch) || ch == '-' ? ch : '-')
-            .ToArray();
-
-        var normalized = new string(chars);
-        while (normalized.Contains("--", StringComparison.Ordinal))
-        {
-            normalized = normalized.Replace("--", "-", StringComparison.Ordinal);
-        }
-
-        return normalized.Trim('-');
-    }
-
     static async Task<JsonDocument> RunAzJson(params string[] azArgs)
     {
         var startInfo = new ProcessStartInfo
@@ -593,10 +577,7 @@ class Program
                     continue;
                 }
 
-                var endpointLower = endpoint.ToLowerInvariant();
-                var kindLower = kind.ToLowerInvariant();
-                if (!endpointLower.Contains(".openai.azure.com", StringComparison.Ordinal)
-                    && !kindLower.Contains("openai", StringComparison.Ordinal))
+                if (!FoundryImportHelpers.IsApplicableAccount(item))
                 {
                     continue;
                 }
@@ -639,32 +620,10 @@ class Program
             var result = new List<FoundryDeployment>();
             foreach (var item in doc.RootElement.EnumerateArray())
             {
-                var deploymentName = item.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? string.Empty : string.Empty;
-                var modelName = deploymentName;
-                var modelVersion = string.Empty;
-
-                if (item.TryGetProperty("properties", out var properties)
-                    && properties.TryGetProperty("model", out var model))
+                var deployment = FoundryImportHelpers.MapDeployment(item);
+                if (!string.IsNullOrWhiteSpace(deployment.DeploymentName))
                 {
-                    if (model.TryGetProperty("name", out var modelNameProp))
-                    {
-                        modelName = modelNameProp.GetString() ?? modelName;
-                    }
-
-                    if (model.TryGetProperty("version", out var modelVersionProp))
-                    {
-                        modelVersion = modelVersionProp.GetString() ?? string.Empty;
-                    }
-                }
-
-                if (!string.IsNullOrWhiteSpace(deploymentName))
-                {
-                    result.Add(new FoundryDeployment
-                    {
-                        DeploymentName = deploymentName,
-                        ModelName = modelName,
-                        ModelVersion = modelVersion
-                    });
+                    result.Add(deployment);
                 }
             }
 
@@ -718,6 +677,7 @@ class Program
 
             var imported = 0;
             var scanned = 0;
+            var existingNames = new HashSet<string>(ConfigManager.ListProfiles().Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
 
             foreach (var foundryAccount in accounts)
             {
@@ -765,21 +725,13 @@ class Program
                         continue;
                     }
 
-                    var profileName = $"foundry-{SanitizeProfilePart(foundryAccount.Name)}-{SanitizeProfilePart(deployment.DeploymentName)}";
-                    var profile = new Profile
-                    {
-                        Name = profileName,
-                        Type = "byok",
-                        BaseUrl = $"{endpoint}/openai/deployments/{deployment.DeploymentName}",
-                        Model = deployment.ModelName,
-                        ProviderType = "azure",
-                        AzureCliToken = "auto",
-                        TokenScope = "https://cognitiveservices.azure.com/.default"
-                    };
+                    var profile = FoundryImportHelpers.BuildImportedProfile(foundryAccount.Name, endpoint, deployment, existingNames);
+                    var profileName = profile.Name;
 
                     if (ConfigManager.AddProfile(profile))
                     {
                         imported += 1;
+                        existingNames.Add(profileName);
                         AnsiConsole.MarkupLine($"  [green]Added[/] {profileName}");
                     }
                     else
@@ -811,17 +763,4 @@ class Program
         public string Output { get; set; } = string.Empty;
     }
 
-    class FoundryAccount
-    {
-        public string Name { get; set; } = string.Empty;
-        public string ResourceGroup { get; set; } = string.Empty;
-        public string Endpoint { get; set; } = string.Empty;
-    }
-
-    class FoundryDeployment
-    {
-        public string DeploymentName { get; set; } = string.Empty;
-        public string ModelName { get; set; } = string.Empty;
-        public string ModelVersion { get; set; } = string.Empty;
-    }
 }
