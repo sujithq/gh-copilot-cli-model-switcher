@@ -158,29 +158,55 @@ async function setEnvironmentForProfile(profile) {
 
 const DEFAULT_MCP_COMPAT_SERVERS = ['foundry-mcp', 'context7', 'msx-mcp', 'azure', 'workiq', 'powerbi-remote'];
 
-function getVsCodeSettingsPaths() {
+function getMcpConfigPaths() {
   const home = os.homedir();
+  const candidates = [];
+  const seen = new Set();
+
+  const add = (p) => {
+    const normalized = path.normalize(p);
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      candidates.push(normalized);
+    }
+  };
+
+  // 1) Project/workspace-level config first (walk up from current directory)
+  let dir = process.cwd();
+  while (true) {
+    add(path.join(dir, 'mcp.json'));
+    add(path.join(dir, '.vscode', 'mcp.json'));
+    add(path.join(dir, '.vscode', 'settings.json'));
+
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  // 2) User-level config next
   if (process.platform === 'win32') {
     const appData = process.env.APPDATA || home;
-    return [
-      path.join(appData, 'Code', 'User', 'settings.json'),
-      path.join(appData, 'Code', 'User', 'mcp.json'),
-    ];
+    add(path.join(appData, 'Code', 'User', 'settings.json'));
+    add(path.join(appData, 'Code', 'User', 'mcp.json'));
   } else if (process.platform === 'darwin') {
     const base = path.join(home, 'Library', 'Application Support', 'Code', 'User');
-    return [path.join(base, 'settings.json'), path.join(base, 'mcp.json')];
+    add(path.join(base, 'settings.json'));
+    add(path.join(base, 'mcp.json'));
   } else {
     const base = path.join(home, '.config', 'Code', 'User');
-    return [path.join(base, 'settings.json'), path.join(base, 'mcp.json')];
+    add(path.join(base, 'settings.json'));
+    add(path.join(base, 'mcp.json'));
   }
+
+  return candidates;
 }
 
 function discoverMcpServers() {
   const discovered = new Set();
 
-  // Strategy 1: VS Code user settings.json / mcp.json
+  // Strategy 1: Project-level then user-level settings.json / mcp.json
   try {
-    for (const p of getVsCodeSettingsPaths()) {
+    for (const p of getMcpConfigPaths()) {
       if (fs.existsSync(p)) {
         const data = JSON.parse(fs.readFileSync(p, 'utf8'));
         // settings.json: "mcp": { "servers": { "name": {...} } }
