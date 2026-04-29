@@ -1,0 +1,38 @@
+{
+  "name": "copilotx",
+  "version": "1.0.0",
+  "description": "GitHub Copilot CLI Model Switcher – switch between Copilot and BYOK model profiles",
+  "type": "module",
+  "bin": {
+    "copilotx": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest --testPathPattern tests/",
+    "lint": "eslint src tests"
+  },
+  "keywords": [
+    "copilot",
+    "cli",
+    "model-switcher",
+    "byok",
+    "llm"
+  ],
+  "author": "copilotx contributors",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "inquirer": "^9.3.7",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "eslint": "^9.26.0",
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "transform": {}
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

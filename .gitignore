@@ -1,0 +1,13 @@
+# Node.js
+node/node_modules/
+node/.eslintcache
+
+# .NET build artifacts
+dotnet/CopilotX/bin/
+dotnet/CopilotX/obj/
+dotnet/**/*.nupkg
+dotnet/**/*.snupkg
+
+# OS artifacts
+.DS_Store
+Thumbs.db
