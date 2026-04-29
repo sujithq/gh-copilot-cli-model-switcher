@@ -45,10 +45,18 @@ copilotx list
 
 Shows all configured profiles in a formatted table. The last used profile is marked with `*`.
 
-After displaying the table you can choose an action in one flow:
-- `Use` to launch a profile interactively
-- `Remove` to multi-select and delete profiles
-- `Exit` to leave without changes
+Read-only output. Use `copilotx manage` for interactive actions.
+
+### Manage profiles (Use/Remove)
+
+```bash
+copilotx manage
+```
+
+Single interactive flow to:
+- `Use` a selected profile
+- `Remove` multiple profiles
+- `Exit`
 
 ### Use a specific profile
 

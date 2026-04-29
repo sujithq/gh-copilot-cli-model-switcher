@@ -670,7 +670,7 @@ const argv = yargs(hideBin(process.argv))
     'list',
     'List all available profiles',
     (yargs) => {
-      yargs.example('$0 list', 'Show all profiles; enter a number to launch one interactively');
+      yargs.example('$0 list', 'Show all profiles (read-only)');
     },
     async (argv) => {
       const profiles = listProfiles();
@@ -696,62 +696,85 @@ const argv = yargs(hideBin(process.argv))
 
       console.log(`* = last used`);
       console.log(`\nConfig file: ${getConfigFile()}`);
+    }
+  )
+  .command(
+    'manage',
+    'Interactive profile management (Use/Remove in one flow)',
+    (yargs) => {
+      yargs.example('$0 manage', 'Choose Use or Remove from one interactive screen');
+    },
+    async () => {
+      const profiles = listProfiles();
+      const lastUsed = getLastUsed();
 
-      // Single interactive flow from list: choose Use or Remove.
-      if (profiles.length > 0) {
-        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-        const answer = await new Promise((resolve) => {
-          rl.question('\nAction: [u]se / [r]emove / [Enter] exit: ', (ans) => resolve((ans || '').trim().toLowerCase()));
+      if (!profiles.length) {
+        console.log('No profiles found.');
+        process.exit(0);
+      }
+
+      console.log('Available profiles:');
+      console.log('');
+      profiles.forEach((profile, index) => {
+        const marker = profile.name === lastUsed ? '* ' : '  ';
+        console.log(`${index + 1}. ${marker}${profile.name} (${profile.type})`);
+      });
+
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      const answer = await new Promise((resolve) => {
+        rl.question('\nAction: [u]se / [r]emove / [Enter] exit: ', (ans) => resolve((ans || '').trim().toLowerCase()));
+      });
+
+      if (!answer) {
+        rl.close();
+        process.exit(0);
+      }
+
+      if (answer === 'u' || answer === 'use') {
+        const selectionRaw = await new Promise((resolve) => {
+          rl.question('Profile #: ', (ans) => resolve((ans || '').trim()));
         });
 
-        if (!answer) {
-          rl.close();
-          return;
-        }
-
-        if (answer === 'u' || answer === 'use') {
-          const selectionRaw = await new Promise((resolve) => {
-            rl.question('Profile #: ', (ans) => resolve((ans || '').trim()));
-          });
-
-          const selection = parseInt(selectionRaw, 10);
-          rl.close();
-
-          if (!isNaN(selection) && selection >= 1 && selection <= profiles.length) {
-            const selectedProfile = profiles[selection - 1];
-            const code = await executeWithProfile(selectedProfile.name, []);
-            process.exit(code);
-            return;
-          }
-
-          console.log('Invalid selection.');
-          return;
-        }
-
-        if (answer === 'r' || answer === 'remove') {
-          rl.close();
-          const removable = profiles.filter((p) => p.name.toLowerCase() !== 'default');
-          const targets = await promptProfilesToRemove(removable);
-
-          if (!targets.length) {
-            console.log('No profiles selected.');
-            return;
-          }
-
-          const result = removeProfiles(targets);
-          if (!result.ok) {
-            console.error('Failed to remove profiles.');
-            process.exit(1);
-            return;
-          }
-
-          console.log(`Removed ${result.removed} profile(s).`);
-          return;
-        }
-
+        const selection = parseInt(selectionRaw, 10);
         rl.close();
-        console.log('Unknown action.');
+
+        if (!isNaN(selection) && selection >= 1 && selection <= profiles.length) {
+          const selectedProfile = profiles[selection - 1];
+          const code = await executeWithProfile(selectedProfile.name, []);
+          process.exit(code);
+          return;
+        }
+
+        console.log('Invalid selection.');
+        process.exit(1);
+        return;
       }
+
+      if (answer === 'r' || answer === 'remove') {
+        rl.close();
+        const removable = profiles.filter((p) => p.name.toLowerCase() !== 'default');
+        const targets = await promptProfilesToRemove(removable);
+
+        if (!targets.length) {
+          console.log('No profiles selected.');
+          process.exit(0);
+        }
+
+        const result = removeProfiles(targets);
+        if (!result.ok) {
+          console.error('Failed to remove profiles.');
+          process.exit(1);
+          return;
+        }
+
+        console.log(`Removed ${result.removed} profile(s).`);
+        process.exit(0);
+        return;
+      }
+
+      rl.close();
+      console.log('Unknown action.');
+      process.exit(1);
     }
   )
   .command(
@@ -991,6 +1014,7 @@ const argv = yargs(hideBin(process.argv))
     }
   )
   .example('$0 list', 'List all profiles; select a number to launch one interactively')
+  .example('$0 manage', 'Use or remove profiles from one interactive flow')
   .example('$0 remove', 'Interactively select profiles to remove')
   .example('$0 use azure-gpt -p "fix the tests"', 'Run a prompt with a specific profile')
   .example('$0 last', 'Use the most recently used profile interactively')
