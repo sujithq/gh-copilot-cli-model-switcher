@@ -161,6 +161,18 @@ function buildCopilotArgs(profile, copilotArgs = []) {
   const disableCompat = (process.env.COPILOTX_DISABLE_MCP_COMPAT || '').trim().toLowerCase() === 'off';
   const args = [...copilotArgs];
 
+  const hasPromptMode = args.includes('-p') || args.includes('--prompt');
+  const hasPermissionControls = args.includes('--allow-all-tools')
+    || args.includes('--allow-all')
+    || args.includes('--yolo')
+    || args.includes('--allow-tool');
+
+  // In non-interactive prompt mode, allow tools automatically so CLI doesn't fail
+  // with "could not request permission from user".
+  if (hasPromptMode && !hasPermissionControls) {
+    args.push('--allow-all-tools');
+  }
+
   // Azure BYOK providers can exceed tool-count limits when many MCP servers are present.
   if (!disableCompat && (profile.type === 'byok' || profile.type === 'proxy') && isAzureProfile(profile)) {
     const hasManualMcpControls = args.some((a) =>
@@ -365,9 +377,28 @@ async function importFoundryProfiles(options) {
   }
 }
 
-function runCopilot(copilotArgs) {
+function runCopilot(copilotArgs, interactiveMode = false) {
   return new Promise((resolve, reject) => {
-    const copilot = spawn('gh', ['copilot', ...copilotArgs], {
+    const ghArgs = copilotArgs.length > 0 ? ['copilot', '--', ...copilotArgs] : ['copilot'];
+
+    if (interactiveMode) {
+      const copilot = spawn('gh', ghArgs, {
+        stdio: 'inherit',
+        env: process.env
+      });
+
+      copilot.on('error', (error) => {
+        reject(error);
+      });
+
+      copilot.on('close', (code) => {
+        resolve({ code: code || 0, output: '' });
+      });
+
+      return;
+    }
+
+    const copilot = spawn('gh', ghArgs, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: process.env
     });
@@ -421,22 +452,24 @@ async function executeWithProfile(profileName, copilotArgs = []) {
 
   setLastUsed(profileName);
 
+  const userRequestedInteractive = copilotArgs.length === 0;
   const effectiveCopilotArgs = buildCopilotArgs(profile, copilotArgs);
 
   // If no args provided, show a hint that we're entering interactive mode
-  if (copilotArgs.length === 0) {
-    console.log('Launching gh copilot in interactive mode. Type your question below:\n');
+  if (userRequestedInteractive) {
+    console.log('Launching gh copilot in interactive mode. Type your question below:');
+    console.log('If prompted to trust this folder, choose option 2 once to remember it.\n');
   }
 
   try {
-    let result = await runCopilot(effectiveCopilotArgs);
+    let result = await runCopilot(effectiveCopilotArgs, userRequestedInteractive);
 
     if (result.code !== 0 && envInfo.usedAzureCliToken && isTokenFailure(result.output)) {
       console.warn('Detected token-related auth failure. Refreshing Azure CLI token and retrying once...');
       const refreshedToken = await getAzureCliToken(profile);
       delete process.env.COPILOT_PROVIDER_API_KEY;
       process.env.COPILOT_PROVIDER_BEARER_TOKEN = refreshedToken;
-      result = await runCopilot(effectiveCopilotArgs);
+      result = await runCopilot(effectiveCopilotArgs, userRequestedInteractive);
     }
 
     return result.code;

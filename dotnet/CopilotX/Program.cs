@@ -202,11 +202,12 @@ class Program
 
         ConfigManager.SetLastUsed(profileName);
 
+        var userRequestedInteractive = copilotArgs.Length == 0;
         var effectiveCopilotArgs = BuildCopilotArgs(profile, copilotArgs);
 
         try
         {
-            var result = await RunCopilot(effectiveCopilotArgs);
+            var result = await RunCopilot(effectiveCopilotArgs, userRequestedInteractive);
 
             if (result.ExitCode != 0 && envInfo.UsedAzureCliToken && IsTokenFailure(result.Output))
             {
@@ -214,7 +215,7 @@ class Program
                 var refreshedToken = await GetAzureCliToken(profile);
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", refreshedToken);
-                result = await RunCopilot(effectiveCopilotArgs);
+                result = await RunCopilot(effectiveCopilotArgs, userRequestedInteractive);
             }
 
             return result.ExitCode;
@@ -234,6 +235,23 @@ class Program
             .Equals("off", StringComparison.OrdinalIgnoreCase);
 
         var args = new List<string>(copilotArgs);
+
+        var hasPromptMode = args.Any(a =>
+            a.Equals("-p", StringComparison.OrdinalIgnoreCase)
+            || a.Equals("--prompt", StringComparison.OrdinalIgnoreCase));
+
+        var hasPermissionControls = args.Any(a =>
+            a.Equals("--allow-all-tools", StringComparison.OrdinalIgnoreCase)
+            || a.Equals("--allow-all", StringComparison.OrdinalIgnoreCase)
+            || a.Equals("--yolo", StringComparison.OrdinalIgnoreCase)
+            || a.Equals("--allow-tool", StringComparison.OrdinalIgnoreCase));
+
+        // In non-interactive prompt mode, allow tools automatically so CLI doesn't fail
+        // with "could not request permission from user".
+        if (hasPromptMode && !hasPermissionControls)
+        {
+            args.Add("--allow-all-tools");
+        }
 
         // Azure BYOK providers can exceed tool-count limits when many MCP servers are present.
         if (!disableCompat && (profile.Type == "byok" || profile.Type == "proxy") && IsAzureProfile(profile))
@@ -441,12 +459,12 @@ class Program
             || lower.Contains("permission denied");
     }
 
-    static async Task<ProcessRunResult> RunCopilot(string[] copilotArgs)
+    static async Task<ProcessRunResult> RunCopilot(string[] copilotArgs, bool interactiveMode)
     {
-        // If no args provided, show a hint that we're entering interactive mode
-        if (copilotArgs.Length == 0)
+        if (interactiveMode)
         {
             AnsiConsole.MarkupLine("[dim]Launching gh copilot in interactive mode. Type your question below:[/]");
+            AnsiConsole.MarkupLine("[dim]If prompted to trust this folder, choose option 2 once to remember it.[/]");
             AnsiConsole.MarkupLine("");
 
             // Interactive gh copilot expects a real terminal (TTY). Avoid redirected pipes here.
@@ -460,6 +478,14 @@ class Program
             };
 
             interactiveStartInfo.ArgumentList.Add("copilot");
+            if (copilotArgs.Length > 0)
+            {
+                interactiveStartInfo.ArgumentList.Add("--");
+                foreach (var arg in copilotArgs)
+                {
+                    interactiveStartInfo.ArgumentList.Add(arg);
+                }
+            }
 
             var interactiveProcess = Process.Start(interactiveStartInfo);
             if (interactiveProcess == null)
@@ -486,9 +512,13 @@ class Program
         };
 
         startInfo.ArgumentList.Add("copilot");
-        foreach (var arg in copilotArgs)
+        if (copilotArgs.Length > 0)
         {
-            startInfo.ArgumentList.Add(arg);
+            startInfo.ArgumentList.Add("--");
+            foreach (var arg in copilotArgs)
+            {
+                startInfo.ArgumentList.Add(arg);
+            }
         }
 
         var process = Process.Start(startInfo);
