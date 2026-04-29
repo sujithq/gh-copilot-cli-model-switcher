@@ -389,6 +389,11 @@ async function executeWithProfile(profileName, copilotArgs = []) {
 
   setLastUsed(profileName);
 
+  // If no args provided, show a hint that we're entering interactive mode
+  if (copilotArgs.length === 0) {
+    console.log('Launching gh copilot in interactive mode. Type your question below:\n');
+  }
+
   try {
     let result = await runCopilot(copilotArgs);
 

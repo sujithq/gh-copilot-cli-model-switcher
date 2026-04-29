@@ -399,6 +399,13 @@ class Program
 
     static async Task<ProcessRunResult> RunCopilot(string[] copilotArgs)
     {
+        // If no args provided, show a hint that we're entering interactive mode
+        if (copilotArgs.Length == 0)
+        {
+            AnsiConsole.MarkupLine("[dim]Launching gh copilot in interactive mode. Type your question below:[/]");
+            AnsiConsole.MarkupLine("");
+        }
+
         var startInfo = new ProcessStartInfo
         {
             FileName = "gh",
