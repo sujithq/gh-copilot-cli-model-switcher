@@ -27,7 +27,8 @@ function sanitizeSegment(value) {
 
 function getAzureIdentityKey() {
   try {
-    const result = spawnSync('az', ['account', 'show', '-o', 'json'], {
+    const azCommand = process.platform === 'win32' ? 'az.cmd' : 'az';
+    const result = spawnSync(azCommand, ['account', 'show', '-o', 'json'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore']
     });
