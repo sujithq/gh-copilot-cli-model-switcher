@@ -14,6 +14,11 @@ cd dotnet/CopilotX && dotnet pack && dotnet tool install --global --add-source .
 
 ## Testing
 
+### All tests
+```powershell
+./run-tests.ps1
+```
+
 ### Node.js
 ```bash
 cd nodejs && npm test
