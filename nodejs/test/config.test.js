@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const config = require('../config');
+const foundry = require('../foundry');
 
 function withIsolatedConfigDir(t) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'copilotx-node-test-'));
@@ -103,4 +104,46 @@ test('getProfile returns undefined for missing profile', (t) => {
   withIsolatedConfigDir(t);
 
   assert.equal(config.getProfile('does-not-exist'), undefined);
+});
+
+test('mapDeployment falls back to deployment name when model metadata is missing', () => {
+  const mapped = foundry.mapDeployment({ name: 'gpt-4o-prod' });
+
+  assert.deepEqual(mapped, {
+    deploymentName: 'gpt-4o-prod',
+    modelName: 'gpt-4o-prod',
+    modelVersion: ''
+  });
+});
+
+test('buildUniqueProfileName appends suffix when base name already exists', () => {
+  const name = foundry.buildUniqueProfileName('My Foundry', 'GPT-4o', [
+    'foundry-my-foundry-gpt-4o',
+    'foundry-my-foundry-gpt-4o-2'
+  ]);
+
+  assert.equal(name, 'foundry-my-foundry-gpt-4o-3');
+});
+
+test('buildImportedProfile creates azure token-based profile for deployment', () => {
+  const profile = foundry.buildImportedProfile(
+    'myfoundry',
+    'https://myfoundry.openai.azure.com/',
+    {
+      deploymentName: 'gpt-4o-prod',
+      modelName: 'gpt-4o',
+      modelVersion: '2024-11-20'
+    },
+    []
+  );
+
+  assert.deepEqual(profile, {
+    name: 'foundry-myfoundry-gpt-4o-prod',
+    type: 'byok',
+    baseUrl: 'https://myfoundry.openai.azure.com/openai/deployments/gpt-4o-prod',
+    model: 'gpt-4o',
+    providerType: 'azure',
+    azureCliToken: 'auto',
+    tokenScope: 'https://cognitiveservices.azure.com/.default'
+  });
 });

@@ -1,4 +1,5 @@
 using CopilotX;
+using System.Text.Json;
 using Xunit;
 
 namespace CopilotX.Tests;
@@ -97,6 +98,52 @@ public class ConfigManagerTests : IDisposable
         var value = ConfigManager.GetLastUsed();
 
         Assert.Equal("azure-gpt", value);
+    }
+
+    [Fact]
+    public void MapDeployment_FallsBackToDeploymentName_WhenModelMetadataMissing()
+    {
+        using var doc = JsonDocument.Parse("{\"name\":\"gpt-4o-prod\"}");
+
+        var deployment = FoundryImportHelpers.MapDeployment(doc.RootElement);
+
+        Assert.Equal("gpt-4o-prod", deployment.DeploymentName);
+        Assert.Equal("gpt-4o-prod", deployment.ModelName);
+        Assert.Equal(string.Empty, deployment.ModelVersion);
+    }
+
+    [Fact]
+    public void BuildUniqueProfileName_AppendsSuffix_WhenNameAlreadyExists()
+    {
+        var result = FoundryImportHelpers.BuildUniqueProfileName(
+            "My Foundry",
+            "GPT-4o",
+            new[] { "foundry-my-foundry-gpt-4o", "foundry-my-foundry-gpt-4o-2" });
+
+        Assert.Equal("foundry-my-foundry-gpt-4o-3", result);
+    }
+
+    [Fact]
+    public void BuildImportedProfile_CreatesAzureTokenProfile()
+    {
+        var profile = FoundryImportHelpers.BuildImportedProfile(
+            "myfoundry",
+            "https://myfoundry.openai.azure.com/",
+            new FoundryDeployment
+            {
+                DeploymentName = "gpt-4o-prod",
+                ModelName = "gpt-4o",
+                ModelVersion = "2024-11-20"
+            },
+            Array.Empty<string>());
+
+        Assert.Equal("foundry-myfoundry-gpt-4o-prod", profile.Name);
+        Assert.Equal("byok", profile.Type);
+        Assert.Equal("https://myfoundry.openai.azure.com/openai/deployments/gpt-4o-prod", profile.BaseUrl);
+        Assert.Equal("gpt-4o", profile.Model);
+        Assert.Equal("azure", profile.ProviderType);
+        Assert.Equal("auto", profile.AzureCliToken);
+        Assert.Equal("https://cognitiveservices.azure.com/.default", profile.TokenScope);
     }
 
 }
