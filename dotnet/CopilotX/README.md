@@ -14,6 +14,12 @@ dotnet pack
 dotnet tool install --global --add-source ./nupkg gh-copilot-byok
 ```
 
+### Install from GitHub Packages (NuGet feed)
+
+```bash
+dotnet tool install --global gh-copilot-byok --add-source "https://nuget.pkg.github.com/sujithq/index.json"
+```
+
 This will make the `gh-copilot-byok` command available globally.
 
 ### Uninstall
@@ -21,6 +27,29 @@ This will make the `gh-copilot-byok` command available globally.
 ```bash
 dotnet tool uninstall --global gh-copilot-byok
 ```
+
+### Update
+
+```bash
+dotnet tool update --global gh-copilot-byok --add-source "https://nuget.pkg.github.com/sujithq/index.json"
+```
+
+## CI/CD and Publishing
+
+This repository includes:
+
+- `.github/workflows/ci.yml`
+  - Node tests
+  - .NET build/tests
+  - pack validation
+- `.github/workflows/release-dotnet-tool.yml`
+  - publishes the .NET tool to GitHub Packages NuGet feed when a release is published
+- `.github/workflows/release-please.yml`
+  - computes semantic versions and generates release notes
+
+Install from GitHub Packages requires authenticated NuGet source configuration.
+
+Full release instructions: [../../RELEASING.md](../../RELEASING.md)
 
 ## Prerequisites
 

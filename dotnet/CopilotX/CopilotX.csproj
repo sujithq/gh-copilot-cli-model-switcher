@@ -12,10 +12,22 @@
     <Version>1.0.0</Version>
     <Authors>gh-copilot-byok</Authors>
     <Description>A lightweight CLI wrapper around GitHub Copilot CLI for easy model switching</Description>
+    <PackageTags>github;copilot;cli;byok;azure-openai;foundry;dotnet-tool</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/sujithq/gh-copilot-cli-model-switcher</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/sujithq/gh-copilot-cli-model-switcher</PackageProjectUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Spectre.Console" Version="0.55.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>
