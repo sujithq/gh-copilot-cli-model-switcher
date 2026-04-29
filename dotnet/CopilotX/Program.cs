@@ -404,6 +404,32 @@ class Program
         {
             AnsiConsole.MarkupLine("[dim]Launching gh copilot in interactive mode. Type your question below:[/]");
             AnsiConsole.MarkupLine("");
+
+            // Interactive gh copilot expects a real terminal (TTY). Avoid redirected pipes here.
+            var interactiveStartInfo = new ProcessStartInfo
+            {
+                FileName = "gh",
+                UseShellExecute = false,
+                RedirectStandardInput = false,
+                RedirectStandardOutput = false,
+                RedirectStandardError = false
+            };
+
+            interactiveStartInfo.ArgumentList.Add("copilot");
+
+            var interactiveProcess = Process.Start(interactiveStartInfo);
+            if (interactiveProcess == null)
+            {
+                throw new InvalidOperationException("Failed to start gh copilot.");
+            }
+
+            await interactiveProcess.WaitForExitAsync();
+
+            return new ProcessRunResult
+            {
+                ExitCode = interactiveProcess.ExitCode,
+                Output = string.Empty
+            };
         }
 
         var startInfo = new ProcessStartInfo
