@@ -16,7 +16,9 @@ const {
 const {
   getProfile,
   addProfile,
+  upsertProfile,
   listProfiles,
+  removeProfiles,
   setLastUsed,
   getLastUsed,
   getConfigFile
@@ -337,6 +339,31 @@ function askQuestion(rl, prompt) {
   return new Promise((resolve) => rl.question(prompt, resolve));
 }
 
+async function promptProfilesToRemove(profiles) {
+  if (!profiles.length) {
+    return [];
+  }
+
+  console.log('\nSelect profiles to remove:');
+  profiles.forEach((p, i) => {
+    console.log(`  ${i + 1}. ${p.name} (${p.type})`);
+  });
+  console.log(`\nEnter numbers to remove (space/comma-separated), 'all', or 'none'.`);
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await new Promise((resolve) => {
+    rl.question('Selection [none]: ', (ans) => { rl.close(); resolve((ans || '').trim()); });
+  });
+
+  if (!answer || answer.toLowerCase() === 'none') return [];
+  if (answer.toLowerCase() === 'all') return profiles.map((p) => p.name);
+
+  const nums = answer.split(/[\s,]+/).map((n) => parseInt(n, 10)).filter((n) => !isNaN(n) && n >= 1 && n <= profiles.length);
+  if (nums.length === 0) return [];
+
+  return [...new Set(nums.map((n) => profiles[n - 1].name))];
+}
+
 function runAzJson(args) {
   return new Promise((resolve, reject) => {
     const az = spawn('az', args, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -490,14 +517,21 @@ async function importFoundryProfiles(options) {
         }
 
         const profile = buildImportedProfile(accountName, endpoint, dep, existingNames);
-        const profileName = profile.name;
+        const result = upsertProfile(profile);
 
-        if (addProfile(profile)) {
+        if (!result.ok) {
+          console.warn(`  Failed to add profile: ${profile.name}`);
+          continue;
+        }
+
+        existingNames.add(result.name);
+        if (result.action === 'added') {
           importedCount += 1;
-          existingNames.add(profileName);
-          console.log(`  Added profile: ${profileName}`);
+          console.log(`  Added profile: ${result.name}`);
+        } else if (result.action === 'updated-equivalent') {
+          console.log(`  Reused existing equivalent profile: ${result.name}`);
         } else {
-          console.warn(`  Failed to add profile: ${profileName}`);
+          console.log(`  Updated profile: ${result.name}`);
         }
       }
     }
@@ -796,8 +830,15 @@ const argv = yargs(hideBin(process.argv))
           }
         }
 
-        if (addProfile(profile)) {
-          console.log(`Profile "${name}" added successfully!`);
+        const result = upsertProfile(profile);
+        if (result.ok) {
+          if (result.action === 'added') {
+            console.log(`Profile "${result.name}" added successfully!`);
+          } else if (result.action === 'updated-equivalent') {
+            console.log(`Equivalent profile already existed; updated "${result.name}" instead of creating a duplicate.`);
+          } else {
+            console.log(`Profile "${result.name}" updated successfully!`);
+          }
         } else {
           console.error('Failed to add profile');
           process.exit(1);
@@ -808,6 +849,42 @@ const argv = yargs(hideBin(process.argv))
       } finally {
         rl.close();
       }
+    }
+  )
+  .command(
+    'remove [profiles..]',
+    'Remove one or more profiles (interactive multi-select when omitted)'
+    , (yargs) => {
+      yargs
+        .positional('profiles', {
+          describe: 'Profile names to remove',
+          type: 'array',
+          default: []
+        })
+        .example('$0 remove azure-gpt ollama-local', 'Remove multiple profiles by name')
+        .example('$0 remove', 'Interactively select multiple profiles to remove');
+    },
+    async (argv) => {
+      let targets = (argv.profiles || []).map((n) => `${n}`.trim()).filter(Boolean);
+
+      if (!targets.length) {
+        const removable = listProfiles().filter((p) => p.name.toLowerCase() !== 'default');
+        targets = await promptProfilesToRemove(removable);
+      }
+
+      if (!targets.length) {
+        console.log('No profiles selected.');
+        process.exit(0);
+      }
+
+      const result = removeProfiles(targets);
+      if (!result.ok) {
+        console.error('Failed to remove profiles.');
+        process.exit(1);
+      }
+
+      console.log(`Removed ${result.removed} profile(s).`);
+      process.exit(0);
     }
   )
   .command(
@@ -868,6 +945,7 @@ const argv = yargs(hideBin(process.argv))
     }
   )
   .example('$0 list', 'List all profiles; select a number to launch one interactively')
+  .example('$0 remove', 'Interactively select profiles to remove')
   .example('$0 use azure-gpt -p "fix the tests"', 'Run a prompt with a specific profile')
   .example('$0 last', 'Use the most recently used profile interactively')
   .example('$0 import-foundry --all', 'Import all Foundry deployments as profiles')

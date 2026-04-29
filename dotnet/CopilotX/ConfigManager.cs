@@ -48,6 +48,13 @@ public class Config
 
 public class ConfigManager
 {
+    public class ProfileUpsertResult
+    {
+        public bool Ok { get; set; }
+        public string Action { get; set; } = "added";
+        public string Name { get; set; } = string.Empty;
+    }
+
     private static readonly string DefaultConfigDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".copilotx"
@@ -239,21 +246,128 @@ public class ConfigManager
         return config.Profiles.FirstOrDefault(p => p.Name == name);
     }
 
-    public static bool AddProfile(Profile profile)
+    private static string Normalize(string? value)
+    {
+        return (value ?? string.Empty).Trim().ToLowerInvariant();
+    }
+
+    private static List<string> NormalizeMcpServers(Profile profile)
+    {
+        return (profile.McpCompatServers ?? new List<string>())
+            .Select(Normalize)
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(s => s, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static string BuildProfileSettingsKey(Profile profile)
+    {
+        var keyObject = new
+        {
+            type = Normalize(profile.Type),
+            model = Normalize(profile.Model),
+            baseUrl = Normalize(profile.BaseUrl),
+            apiKeyEnv = Normalize(profile.ApiKeyEnv),
+            apiKey = Normalize(profile.ApiKey),
+            providerType = Normalize(profile.ProviderType),
+            azureCliToken = Normalize(profile.AzureCliToken),
+            tokenScope = Normalize(profile.TokenScope),
+            mcpCompatServers = NormalizeMcpServers(profile)
+        };
+
+        return JsonSerializer.Serialize(keyObject);
+    }
+
+    public static ProfileUpsertResult UpsertProfile(Profile profile)
     {
         var config = LoadConfig();
+        var incomingName = (profile.Name ?? string.Empty).Trim();
 
-        var existingIndex = config.Profiles.FindIndex(p => p.Name == profile.Name);
-        if (existingIndex >= 0)
+        var existingByNameIndex = config.Profiles.FindIndex(p =>
+            string.Equals(p.Name, incomingName, StringComparison.OrdinalIgnoreCase));
+
+        if (existingByNameIndex >= 0)
         {
-            config.Profiles[existingIndex] = profile;
-        }
-        else
-        {
-            config.Profiles.Add(profile);
+            config.Profiles[existingByNameIndex] = profile;
+            return new ProfileUpsertResult
+            {
+                Ok = SaveConfig(config),
+                Action = "updated-by-name",
+                Name = incomingName
+            };
         }
 
-        return SaveConfig(config);
+        var incomingKey = BuildProfileSettingsKey(profile);
+        var equivalentIndex = config.Profiles.FindIndex(p => BuildProfileSettingsKey(p) == incomingKey);
+
+        if (equivalentIndex >= 0)
+        {
+            var existingName = config.Profiles[equivalentIndex].Name;
+            config.Profiles[equivalentIndex] = new Profile
+            {
+                Name = existingName,
+                Type = profile.Type,
+                Model = profile.Model,
+                BaseUrl = profile.BaseUrl,
+                ApiKeyEnv = profile.ApiKeyEnv,
+                ApiKey = profile.ApiKey,
+                ProviderType = profile.ProviderType,
+                AzureCliToken = profile.AzureCliToken,
+                TokenScope = profile.TokenScope,
+                McpCompatServers = profile.McpCompatServers
+            };
+
+            return new ProfileUpsertResult
+            {
+                Ok = SaveConfig(config),
+                Action = "updated-equivalent",
+                Name = existingName
+            };
+        }
+
+        config.Profiles.Add(profile);
+        return new ProfileUpsertResult
+        {
+            Ok = SaveConfig(config),
+            Action = "added",
+            Name = incomingName
+        };
+    }
+
+    public static bool AddProfile(Profile profile)
+    {
+        return UpsertProfile(profile).Ok;
+    }
+
+    public static (bool Ok, int Removed) RemoveProfiles(IEnumerable<string> names)
+    {
+        var config = LoadConfig();
+        var targets = new HashSet<string>(
+            names.Select(n => (n ?? string.Empty).Trim())
+                .Where(n => !string.IsNullOrWhiteSpace(n)),
+            StringComparer.OrdinalIgnoreCase);
+
+        if (targets.Count == 0)
+        {
+            return (true, 0);
+        }
+
+        var before = config.Profiles.Count;
+        config.Profiles = config.Profiles
+            .Where(p => p.Name.Equals("default", StringComparison.OrdinalIgnoreCase) || !targets.Contains(p.Name))
+            .ToList();
+
+        var removed = before - config.Profiles.Count;
+
+        if (removed > 0 && targets.Contains(config.LastUsed))
+        {
+            config.LastUsed = config.Profiles.Any(p => p.Name.Equals("default", StringComparison.OrdinalIgnoreCase))
+                ? "default"
+                : (config.Profiles.FirstOrDefault()?.Name ?? "default");
+        }
+
+        return (SaveConfig(config), removed);
     }
 
     public static List<Profile> ListProfiles()
