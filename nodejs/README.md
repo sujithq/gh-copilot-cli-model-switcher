@@ -189,6 +189,8 @@ az account get-access-token --scope https://cognitiveservices.azure.com/.default
 
 Then it sets the returned token as `COPILOT_PROVIDER_BEARER_TOKEN`. In token mode, `COPILOT_PROVIDER_API_KEY` is cleared to avoid auth-mode ambiguity.
 
+For Azure BYOK profiles, CopilotX also enables an MCP compatibility mode by default to avoid provider tool-count limits (for example: `Invalid 'tools': array too long`). Set `COPILOTX_DISABLE_MCP_COMPAT=off` to opt out.
+
 Retry behavior:
 - If `gh copilot` fails with token/auth-related errors, CopilotX refreshes the token and retries once.
 

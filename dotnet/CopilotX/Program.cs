@@ -202,9 +202,11 @@ class Program
 
         ConfigManager.SetLastUsed(profileName);
 
+        var effectiveCopilotArgs = BuildCopilotArgs(profile, copilotArgs);
+
         try
         {
-            var result = await RunCopilot(copilotArgs);
+            var result = await RunCopilot(effectiveCopilotArgs);
 
             if (result.ExitCode != 0 && envInfo.UsedAzureCliToken && IsTokenFailure(result.Output))
             {
@@ -212,7 +214,7 @@ class Program
                 var refreshedToken = await GetAzureCliToken(profile);
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", refreshedToken);
-                result = await RunCopilot(copilotArgs);
+                result = await RunCopilot(effectiveCopilotArgs);
             }
 
             return result.ExitCode;
@@ -223,6 +225,43 @@ class Program
             AnsiConsole.MarkupLine("[dim]Make sure GitHub Copilot CLI is installed: gh extension install github/gh-copilot[/]");
             return 1;
         }
+    }
+
+    static string[] BuildCopilotArgs(Profile profile, string[] copilotArgs)
+    {
+        var disableCompat = (Environment.GetEnvironmentVariable("COPILOTX_DISABLE_MCP_COMPAT") ?? string.Empty)
+            .Trim()
+            .Equals("off", StringComparison.OrdinalIgnoreCase);
+
+        var args = new List<string>(copilotArgs);
+
+        // Azure BYOK providers can exceed tool-count limits when many MCP servers are present.
+        if (!disableCompat && (profile.Type == "byok" || profile.Type == "proxy") && IsAzureProfile(profile))
+        {
+            var hasManualMcpControls = args.Any(a =>
+                a.Equals("--disable-mcp-server", StringComparison.OrdinalIgnoreCase)
+                || a.Equals("--disable-builtin-mcps", StringComparison.OrdinalIgnoreCase)
+                || a.Equals("--available-tools", StringComparison.OrdinalIgnoreCase));
+
+            if (!hasManualMcpControls)
+            {
+                var prefix = new List<string>
+                {
+                    "--disable-builtin-mcps",
+                    "--disable-mcp-server", "foundry-mcp",
+                    "--disable-mcp-server", "context7",
+                    "--disable-mcp-server", "msx-mcp",
+                    "--disable-mcp-server", "azure",
+                    "--disable-mcp-server", "workiq",
+                    "--disable-mcp-server", "powerbi-remote"
+                };
+
+                AnsiConsole.MarkupLine("[dim]Applying Azure BYOK MCP compatibility mode to avoid provider tool-limit errors.[/]");
+                return prefix.Concat(args).ToArray();
+            }
+        }
+
+        return args.ToArray();
     }
 
     static bool IsAzureProfile(Profile profile)
