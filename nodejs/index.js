@@ -157,6 +157,34 @@ function isTokenFailure(text) {
   return /(401|unauthorized|forbidden|invalid token|token expired|expired token|authentication failed|permission denied)/i.test(text || '');
 }
 
+function buildCopilotArgs(profile, copilotArgs = []) {
+  const disableCompat = (process.env.COPILOTX_DISABLE_MCP_COMPAT || '').trim().toLowerCase() === 'off';
+  const args = [...copilotArgs];
+
+  // Azure BYOK providers can exceed tool-count limits when many MCP servers are present.
+  if (!disableCompat && (profile.type === 'byok' || profile.type === 'proxy') && isAzureProfile(profile)) {
+    const hasManualMcpControls = args.some((a) =>
+      a === '--disable-mcp-server' || a === '--disable-builtin-mcps' || a === '--available-tools'
+    );
+
+    if (!hasManualMcpControls) {
+      console.log('Applying Azure BYOK MCP compatibility mode to avoid provider tool-limit errors.');
+      return [
+        '--disable-builtin-mcps',
+        '--disable-mcp-server', 'foundry-mcp',
+        '--disable-mcp-server', 'context7',
+        '--disable-mcp-server', 'msx-mcp',
+        '--disable-mcp-server', 'azure',
+        '--disable-mcp-server', 'workiq',
+        '--disable-mcp-server', 'powerbi-remote',
+        ...args
+      ];
+    }
+  }
+
+  return args;
+}
+
 function askQuestion(rl, prompt) {
   return new Promise((resolve) => rl.question(prompt, resolve));
 }
@@ -393,20 +421,22 @@ async function executeWithProfile(profileName, copilotArgs = []) {
 
   setLastUsed(profileName);
 
+  const effectiveCopilotArgs = buildCopilotArgs(profile, copilotArgs);
+
   // If no args provided, show a hint that we're entering interactive mode
   if (copilotArgs.length === 0) {
     console.log('Launching gh copilot in interactive mode. Type your question below:\n');
   }
 
   try {
-    let result = await runCopilot(copilotArgs);
+    let result = await runCopilot(effectiveCopilotArgs);
 
     if (result.code !== 0 && envInfo.usedAzureCliToken && isTokenFailure(result.output)) {
       console.warn('Detected token-related auth failure. Refreshing Azure CLI token and retrying once...');
       const refreshedToken = await getAzureCliToken(profile);
       delete process.env.COPILOT_PROVIDER_API_KEY;
       process.env.COPILOT_PROVIDER_BEARER_TOKEN = refreshedToken;
-      result = await runCopilot(copilotArgs);
+      result = await runCopilot(effectiveCopilotArgs);
     }
 
     return result.code;

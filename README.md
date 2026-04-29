@@ -121,6 +121,8 @@ GitHub Copilot CLI can connect to external models via environment variables:
 
 CopilotX can now source Azure CLI access tokens when API keys are disabled. In token mode, it sets `COPILOT_PROVIDER_BEARER_TOKEN` and clears `COPILOT_PROVIDER_API_KEY` to avoid auth-mode ambiguity.
 
+For Azure BYOK profiles, CopilotX also enables an MCP compatibility mode by default to avoid provider tool-count limits (e.g. `tools array too long`). It launches `gh copilot` with MCP-disable flags for common high-volume servers. Set `COPILOTX_DISABLE_MCP_COMPAT=off` to opt out.
+
 This allows connecting to:
 - OpenAI
 - Azure OpenAI
