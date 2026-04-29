@@ -115,10 +115,11 @@ copilotx import-foundry --account myfoundry --resource-group my-rg --all
 GitHub Copilot CLI can connect to external models via environment variables:
 - `COPILOT_PROVIDER_BASE_URL`
 - `COPILOT_PROVIDER_API_KEY`
+- `COPILOT_PROVIDER_BEARER_TOKEN`
 - `COPILOT_MODEL`
 - `COPILOT_PROVIDER_TYPE`
 
-CopilotX can now source `COPILOT_PROVIDER_API_KEY` from Azure CLI access tokens when API keys are disabled.
+CopilotX can now source Azure CLI access tokens when API keys are disabled, and sets both `COPILOT_PROVIDER_BEARER_TOKEN` and `COPILOT_PROVIDER_API_KEY` for compatibility.
 
 This allows connecting to:
 - OpenAI
