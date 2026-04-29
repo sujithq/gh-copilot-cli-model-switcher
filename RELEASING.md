@@ -1,11 +1,12 @@
 # Releasing gh-copilot-byok
 
-This project publishes the .NET global tool package `gh-copilot-byok` to GitHub Packages (NuGet registry).
+This project publishes the .NET global tool package `gh-copilot-byok` to both NuGet.org and GitHub Packages (NuGet registry).
 
 ## One-time setup
 
 1. Ensure package metadata is correct in `dotnet/CopilotX/CopilotX.csproj`.
 2. Ensure workflow permissions include `packages: write` (already configured).
+3. Add a `NUGET_API_KEY` repository secret with an API key from [nuget.org](https://www.nuget.org/) that has push permissions for the `gh-copilot-byok` package.
 
 ## Release workflow
 
@@ -18,10 +19,25 @@ This project publishes the .NET global tool package `gh-copilot-byok` to GitHub 
 5. GitHub Actions workflow `Release .NET Tool` runs on `release.published` and will:
   - Build and test
   - Pack with package version derived from release tag
+  - Push package to NuGet.org (public, no authentication required for install)
   - Push package to GitHub Packages NuGet feed
   - Upload `.nupkg` to that published GitHub Release
 
-## Verify installation
+## Install after release
+
+### From NuGet.org (recommended — no authentication required)
+
+```powershell
+dotnet tool install --global gh-copilot-byok
+```
+
+If already installed:
+
+```powershell
+dotnet tool update --global gh-copilot-byok
+```
+
+### From GitHub Packages (alternative)
 
 GitHub Packages NuGet feed requires authentication.
 

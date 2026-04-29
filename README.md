@@ -77,7 +77,19 @@ dotnet tool install --global --add-source ./nupkg gh-copilot-byok
 gh-copilot-byok list
 ```
 
-### Install from GitHub Packages (NuGet feed) after first release
+### Install from NuGet.org (recommended)
+
+```bash
+dotnet tool install --global gh-copilot-byok
+```
+
+Update an existing installation:
+
+```bash
+dotnet tool update --global gh-copilot-byok
+```
+
+### Install from GitHub Packages (alternative — requires authentication)
 
 ```bash
 dotnet tool install --global gh-copilot-byok --add-source "https://nuget.pkg.github.com/sujithq/index.json"

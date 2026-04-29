@@ -73,6 +73,15 @@ jobs:
             --source "https://nuget.pkg.github.com/$OWNER/index.json" \
             --skip-duplicate
 
+      - name: Push package to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push dotnet/CopilotX/nupkg/*.nupkg \
+            --api-key "$NUGET_API_KEY" \
+            --source "https://api.nuget.org/v3/index.json" \
+            --skip-duplicate
+
       - name: Upload release assets
         uses: softprops/action-gh-release@v3
         with:
