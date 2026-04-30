@@ -1017,7 +1017,7 @@ const argv = yargs(hideBin(process.argv))
           default: []
         })
         .example('$0 use azure-gpt', 'Interactive mode with the azure-gpt profile')
-        .example('$0 use azure-gpt suggest "how to list files"', 'Pass a sub-command to gh copilot')
+        .example('$0 use azure-gpt -p "how to list files"', 'Run in non-interactive prompt mode')
         .example('$0 use azure-gpt -p "fix the failing tests"', 'Non-interactive prompt mode')
         .example('$0 use azure-gpt -p "refactor this" --allow-tool=write', 'Restrict to the write tool only')
         .example('$0 use azure-gpt -p "explain this" --deny-tool=run_command', 'Deny a specific tool');
@@ -1063,7 +1063,7 @@ const argv = yargs(hideBin(process.argv))
         })
         .example('$0 last', 'Interactive mode with the last used profile')
         .example('$0 last -p "explain this code"', 'Non-interactive prompt mode')
-        .example('$0 last suggest "how to list files"', 'Pass a sub-command to gh copilot');
+        .example('$0 last -p "how to list files"', 'Run in non-interactive prompt mode');
     },
     async (argv) => {
       const lastUsed = getLastUsed();
@@ -1172,7 +1172,7 @@ const argv = yargs(hideBin(process.argv))
         })
         .example('$0 default', 'Interactive mode with the default Copilot profile')
         .example('$0 default -p "explain this code"', 'Non-interactive prompt mode')
-        .example('$0 default suggest "how to list files"', 'Pass a sub-command to gh copilot');
+        .example('$0 default -p "how to list files"', 'Run in non-interactive prompt mode');
     },
     async (argv) => {
       const code = await executeWithProfile('default', argv['copilot-args'] || []);

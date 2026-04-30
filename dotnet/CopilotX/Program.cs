@@ -116,7 +116,7 @@ class Program
         AnsiConsole.MarkupLine("  gh-copilot-byok remove");
         AnsiConsole.MarkupLine("  gh-copilot-byok remove azure-gpt ollama-local");
         AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt");
-        AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt suggest \"create a function\"");
+        AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt -p \"create a function\"");
         AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt -p \"fix the failing tests\"");
         AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt -p \"refactor this\" --allow-tool=write");
         AnsiConsole.MarkupLine("  gh-copilot-byok last -p \"explain this code\"");

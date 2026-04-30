@@ -42,7 +42,7 @@ export AZURE_OPENAI_KEY="your-api-key-here"
 
 **Usage**:
 ```bash
-gh-copilot-byok use azure-gpt4 suggest "create a function to parse JSON"
+gh-copilot-byok use azure-gpt4 -p "create a function to parse JSON"
 ```
 
 ### Azure OpenAI with RBAC (API Keys Disabled, Local Wrapper)
@@ -66,7 +66,7 @@ az login
 
 **Usage**:
 ```bash
-gh-copilot-byok use azure-rbac-local suggest "create a function to parse JSON"
+gh-copilot-byok use azure-rbac-local -p "create a function to parse JSON"
 ```
 
 Notes:
@@ -92,7 +92,7 @@ export OPENAI_API_KEY="sk-..."
 
 **Usage**:
 ```bash
-gh-copilot-byok use openai-gpt4 explain "what does this code do"
+gh-copilot-byok use openai-gpt4 -p "what does this code do"
 ```
 
 ### Ollama Local
@@ -120,7 +120,7 @@ ollama serve
 
 **Usage**:
 ```bash
-gh-copilot-byok use ollama-llama3 suggest "write a hello world script"
+gh-copilot-byok use ollama-llama3 -p "write a hello world script"
 ```
 
 ### Azure OpenAI via APIM Proxy
@@ -145,7 +145,7 @@ export APIM_SUBSCRIPTION_KEY="your-subscription-key"
 
 **Usage**:
 ```bash
-gh-copilot-byok use azure-proxy suggest "help me debug this"
+gh-copilot-byok use azure-proxy -p "help me debug this"
 ```
 
 ## Usage Scenarios
@@ -161,8 +161,8 @@ gh-copilot-byok add
 # Enter: openai-dev, byok, https://api.openai.com/v1, gpt-4, env, OPENAI_API_KEY
 
 # Use for coding
-gh-copilot-byok use openai-dev suggest "create a REST API endpoint"
-gh-copilot-byok use openai-dev explain "how does this function work"
+gh-copilot-byok use openai-dev -p "create a REST API endpoint"
+gh-copilot-byok use openai-dev -p "how does this function work"
 ```
 
 ### Scenario 2: Enterprise Azure with Multiple Deployments
@@ -177,8 +177,8 @@ gh-copilot-byok add
 # Enter: azure-dev, byok, https://dev.openai.azure.com/..., gpt-4, env, AZURE_DEV_KEY
 
 # Use different profiles for different tasks
-gh-copilot-byok use azure-dev suggest "test function"
-gh-copilot-byok use azure-prod explain "production code"
+gh-copilot-byok use azure-dev -p "test function"
+gh-copilot-byok use azure-prod -p "production code"
 ```
 
 ### Scenario 3: Offline Development with Ollama
@@ -193,8 +193,8 @@ gh-copilot-byok add
 # Enter: local, byok, http://localhost:11434/v1, llama3, none
 
 # Work offline
-gh-copilot-byok use local suggest "create a function"
-gh-copilot-byok use local explain "what is this"
+gh-copilot-byok use local -p "create a function"
+gh-copilot-byok use local -p "what is this"
 ```
 
 ### Scenario 4: Switching Between Models
@@ -204,25 +204,25 @@ gh-copilot-byok use local explain "what is this"
 gh-copilot-byok list
 
 # Try different models for comparison
-gh-copilot-byok use gpt-4 suggest "optimize this code"
-gh-copilot-byok use gpt-3.5 suggest "optimize this code"
-gh-copilot-byok use llama3 suggest "optimize this code"
+gh-copilot-byok use gpt-4 -p "optimize this code"
+gh-copilot-byok use gpt-3.5 -p "optimize this code"
+gh-copilot-byok use llama3 -p "optimize this code"
 
 # Use last profile quickly
-gh-copilot-byok last suggest "another question"
+gh-copilot-byok last -p "another question"
 ```
 
 ### Scenario 5: Testing with Different Providers
 
 ```bash
 # Test with OpenAI
-gh-copilot-byok use openai-gpt4 suggest "write unit tests for this function"
+gh-copilot-byok use openai-gpt4 -p "write unit tests for this function"
 
 # Test with Azure
-gh-copilot-byok use azure-gpt4 suggest "write unit tests for this function"
+gh-copilot-byok use azure-gpt4 -p "write unit tests for this function"
 
 # Test locally
-gh-copilot-byok use ollama-llama3 suggest "write unit tests for this function"
+gh-copilot-byok use ollama-llama3 -p "write unit tests for this function"
 
 # Compare results and choose preferred provider
 ```
@@ -332,18 +332,18 @@ Not this:
 gh-copilot-byok use azure-gpt4
 
 # From now on, just use:
-gh-copilot-byok last suggest "..."
-gh-copilot-byok last explain "..."
+gh-copilot-byok last -p "..."
+gh-copilot-byok last -p "..."
 ```
 
 ### 5. Test Locally First
 
 ```bash
 # Test with Ollama before using paid APIs
-gh-copilot-byok use ollama-local suggest "is this approach correct?"
+gh-copilot-byok use ollama-local -p "is this approach correct?"
 
 # Once confirmed, switch to production
-gh-copilot-byok use azure-prod suggest "implement the final version"
+gh-copilot-byok use azure-prod -p "implement the final version"
 ```
 
 ## Troubleshooting Examples
@@ -418,8 +418,8 @@ alias cxs='gh-copilot-byok use'
 
 # Usage
 cx list
-cxl suggest "create a function"
-cxs azure-prod explain "this code"
+cxl -p "create a function"
+cxs azure-prod -p "this code"
 ```
 
 ## Sample Workflows
@@ -444,9 +444,9 @@ gh-copilot-byok last
 
 ```bash
 # Review with multiple models
-gh-copilot-byok use gpt-4 explain "review this code"
-gh-copilot-byok use azure-gpt4 explain "review this code"
-gh-copilot-byok use claude explain "review this code"
+gh-copilot-byok use gpt-4 -p "review this code"
+gh-copilot-byok use azure-gpt4 -p "review this code"
+gh-copilot-byok use claude -p "review this code"
 
 # Compare insights from different models
 ```
@@ -457,7 +457,7 @@ gh-copilot-byok use claude explain "review this code"
 # Test prompt with each model
 for profile in gpt-4 gpt-3.5 llama3; do
   echo "Testing with $profile"
-  gh-copilot-byok use $profile suggest "optimize this algorithm"
+  gh-copilot-byok use $profile -p "optimize this algorithm"
 done
 ```
 
@@ -468,7 +468,7 @@ done
 ```bash
 # .git/hooks/pre-commit
 #!/bin/bash
-gh-copilot-byok use azure-dev explain "check code quality of staged files"
+gh-copilot-byok use azure-dev -p "check code quality of staged files"
 ```
 
 ### With CI/CD
@@ -478,7 +478,7 @@ gh-copilot-byok use azure-dev explain "check code quality of staged files"
 - name: AI Code Review
   run: |
     export AZURE_OPENAI_KEY="${{ secrets.AZURE_OPENAI_KEY }}"
-    gh-copilot-byok use azure-gpt4 explain "review changes"
+    gh-copilot-byok use azure-gpt4 -p "review changes"
 ```
 
 ### With VS Code Tasks
@@ -488,9 +488,9 @@ gh-copilot-byok use azure-dev explain "check code quality of staged files"
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Copilot Explain",
+      "label": "Copilot Prompt",
       "type": "shell",
-      "command": "gh-copilot-byok last explain '${selectedText}'"
+      "command": "gh-copilot-byok last -p '${selectedText}'"
     }
   ]
 }

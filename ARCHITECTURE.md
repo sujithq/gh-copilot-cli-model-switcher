@@ -179,11 +179,11 @@ Confirm Success
 ### Using a Profile
 
 ```
-Command: gh-copilot-byok use azure-gpt suggest "help"
+Command: gh-copilot-byok use azure-gpt -p "help"
     ↓
 Parse Arguments
     profile: "azure-gpt"
-    copilot-args: ["suggest", "help"]
+    copilot-args: ["-p", "help"]
     ↓
 Load Config from Disk
     ↓
@@ -198,7 +198,7 @@ Update lastUsed = "azure-gpt"
     ↓
 Save Config to Disk
     ↓
-Execute: gh copilot suggest "help"
+Execute: gh copilot -p "help"
     ↓
 Return Exit Code
 ```

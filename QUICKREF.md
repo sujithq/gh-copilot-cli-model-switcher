@@ -142,9 +142,9 @@ gh-copilot-byok use ollama
 
 ### With Commands
 ```bash
-gh-copilot-byok use azure-gpt4 suggest "create a function"
-gh-copilot-byok use ollama explain "what does this do"
-gh-copilot-byok last suggest "another question"
+gh-copilot-byok use azure-gpt4 -p "create a function"
+gh-copilot-byok use ollama -p "what does this do"
+gh-copilot-byok last -p "another question"
 ```
 
 ### Quick Access
@@ -153,8 +153,8 @@ gh-copilot-byok last suggest "another question"
 gh-copilot-byok use azure-gpt4
 
 # Use it repeatedly
-gh-copilot-byok last suggest "..."
-gh-copilot-byok last explain "..."
+gh-copilot-byok last -p "..."
+gh-copilot-byok last -p "..."
 ```
 
 ### Import Foundry Deployments
