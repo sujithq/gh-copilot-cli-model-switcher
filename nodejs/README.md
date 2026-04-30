@@ -83,9 +83,9 @@ All arguments after the profile name are forwarded directly to `gh copilot`.
 # Interactive mode
 gh-copilot-byok use azure-gpt
 
-# Sub-command passthrough
-gh-copilot-byok use azure-gpt suggest "how to list files"
-gh-copilot-byok use ollama-local explain "what is this code doing"
+# Prompt mode examples
+gh-copilot-byok use azure-gpt -p "how to list files"
+gh-copilot-byok use ollama-local -p "what is this code doing"
 
 # Non-interactive prompt (-p / --prompt)
 gh-copilot-byok use azure-gpt -p "fix the failing tests"
@@ -124,7 +124,7 @@ gh-copilot-byok last
 
 # Non-interactive prompt
 gh-copilot-byok last -p "explain this code"
-gh-copilot-byok last suggest "how to list files"
+gh-copilot-byok last -p "how to list files"
 ```
 
 ### Use default Copilot
@@ -141,7 +141,7 @@ gh-copilot-byok default
 
 # Non-interactive prompt
 gh-copilot-byok default -p "explain this code"
-gh-copilot-byok default suggest "how do I list files?"
+gh-copilot-byok default -p "how do I list files?"
 ```
 
 ### Add a new profile
@@ -447,11 +447,11 @@ gh-copilot-byok use azure-gpt
 # Use Azure profile with a prompt (non-interactive)
 gh-copilot-byok use azure-gpt -p "create a function to sort an array"
 
-# Use Azure profile with suggest sub-command
-gh-copilot-byok use azure-gpt suggest "create a function to sort an array"
+# Use Azure profile with prompt mode
+gh-copilot-byok use azure-gpt -p "create a function to sort an array"
 
 # Switch back to default
-gh-copilot-byok default suggest "explain this code"
+gh-copilot-byok default -p "explain this code"
 
 # Use last profile
 gh-copilot-byok last

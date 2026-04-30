@@ -439,14 +439,14 @@ gh-copilot-byok add
 # List all profiles
 gh-copilot-byok list
 
-# Use Azure profile with Copilot suggest
-gh-copilot-byok use azure-gpt suggest "create a function to sort an array"
+# Use Azure profile with Copilot prompt mode
+gh-copilot-byok use azure-gpt -p "create a function to sort an array"
 
 # Use Ollama for local inference
-gh-copilot-byok use ollama-local explain "what is this code"
+gh-copilot-byok use ollama-local -p "what is this code"
 
 # Quick access to last used profile
-gh-copilot-byok last suggest "how to debug this"
+gh-copilot-byok last -p "how to debug this"
 
 # Switch back to default
 gh-copilot-byok default

@@ -252,10 +252,10 @@ gh-copilot-byok list
 gh-copilot-byok add
 
 # Use specific profile
-gh-copilot-byok use azure-gpt4 suggest "create a function"
+gh-copilot-byok use azure-gpt4 -p "create a function"
 
 # Use last profile
-gh-copilot-byok last explain "this code"
+gh-copilot-byok last -p "this code"
 
 # Switch to default
 gh-copilot-byok default
