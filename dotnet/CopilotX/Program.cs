@@ -1,4 +1,4 @@
-using Spectre.Console;
+﻿using Spectre.Console;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -55,7 +55,7 @@ class Program
     static int ShowHelp()
     {
         AnsiConsole.Write(
-            new FigletText("gh-copilot-byok")
+            new FigletText("copilot-byok-model-switcher")
                 .LeftJustified()
                 .Color(Color.Blue));
 
@@ -107,25 +107,25 @@ class Program
         AnsiConsole.MarkupLine("  disable (to avoid provider tool-count limits). The selection is saved as [cyan]mcpCompatServers[/] on the");
         AnsiConsole.MarkupLine("  profile and reused on every subsequent run. Remove the field from config to re-prompt.");
         AnsiConsole.MarkupLine("  Default candidates: [dim]foundry-mcp, context7, msx-mcp, azure, workiq, powerbi-remote[/]");
-        AnsiConsole.MarkupLine("  Set [cyan]GH_COPILOT_BYOK_DISABLE_MCP_COMPAT=off[/] to skip compat mode entirely.");
+        AnsiConsole.MarkupLine("  Set [cyan]CBMS_DISABLE_MCP_COMPAT=off[/] to skip compat mode entirely.");
 
         AnsiConsole.MarkupLine("\n[dim]Examples:[/]");
-        AnsiConsole.MarkupLine("  gh-copilot-byok list");
-        AnsiConsole.MarkupLine("  gh-copilot-byok manage");
-        AnsiConsole.MarkupLine("  gh-copilot-byok mcp-compat azure-gpt --action reset");
-        AnsiConsole.MarkupLine("  gh-copilot-byok remove");
-        AnsiConsole.MarkupLine("  gh-copilot-byok remove azure-gpt ollama-local");
-        AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt");
-        AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt -p \"create a function\"");
-        AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt -p \"fix the failing tests\"");
-        AnsiConsole.MarkupLine("  gh-copilot-byok use azure-gpt -p \"refactor this\" --allow-tool=write");
-        AnsiConsole.MarkupLine("  gh-copilot-byok last -p \"explain this code\"");
-        AnsiConsole.MarkupLine("  gh-copilot-byok default");
-        AnsiConsole.MarkupLine("  gh-copilot-byok add");
-        AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry");
-        AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry --all");
-        AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all");
-        AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry --subscription 00000000-0000-0000-0000-000000000000 --all");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher list");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher manage");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher mcp-compat azure-gpt --action reset");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher remove");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher remove azure-gpt ollama-local");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher use azure-gpt");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher use azure-gpt -p \"create a function\"");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher use azure-gpt -p \"fix the failing tests\"");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher use azure-gpt -p \"refactor this\" --allow-tool=write");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher last -p \"explain this code\"");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher default");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher add");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher import-foundry");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher import-foundry --all");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher import-foundry --account myfoundry --resource-group my-rg --all");
+        AnsiConsole.MarkupLine("  copilot-byok-model-switcher import-foundry --subscription 00000000-0000-0000-0000-000000000000 --all");
 
         return 0;
     }
@@ -372,7 +372,7 @@ class Program
         if (args.Length == 0)
         {
             AnsiConsole.MarkupLine("[red]Error: Profile name required[/]");
-            AnsiConsole.MarkupLine("Usage: gh-copilot-byok mcp-compat <profile> [--action set|reset|all|none]");
+            AnsiConsole.MarkupLine("Usage: copilot-byok-model-switcher mcp-compat <profile> [--action set|reset|all|none]");
             return 1;
         }
 
@@ -460,7 +460,7 @@ class Program
         if (args.Length == 0)
         {
             AnsiConsole.MarkupLine("[red]Error: Profile name required[/]");
-            AnsiConsole.MarkupLine("Usage: gh-copilot-byok use <profile> [args...]");
+            AnsiConsole.MarkupLine("Usage: copilot-byok-model-switcher use <profile> [args...]");
             return 1;
         }
 
@@ -495,7 +495,7 @@ class Program
         if (profile == null)
         {
             AnsiConsole.MarkupLine($"[red]Error: Profile '{Markup.Escape(profileName)}' not found[/]");
-            AnsiConsole.MarkupLine("Use 'gh-copilot-byok list' to see available profiles.");
+            AnsiConsole.MarkupLine("Use 'copilot-byok-model-switcher list' to see available profiles.");
             return 1;
         }
 
@@ -518,7 +518,7 @@ class Program
         var userRequestedInteractive = copilotArgs.Length == 0;
 
         // For Azure BYOK profiles in interactive mode, prompt for MCP servers to disable on first use.
-        var needsCompat = !(Environment.GetEnvironmentVariable("GH_COPILOT_BYOK_DISABLE_MCP_COMPAT")
+        var needsCompat = !(Environment.GetEnvironmentVariable("CBMS_DISABLE_MCP_COMPAT")
             ?? Environment.GetEnvironmentVariable("COPILOTX_DISABLE_MCP_COMPAT")
             ?? string.Empty)
             .Trim().Equals("off", StringComparison.OrdinalIgnoreCase)
@@ -563,7 +563,7 @@ class Program
 
     static string[] BuildCopilotArgs(Profile profile, string[] copilotArgs)
     {
-        var disableCompat = (Environment.GetEnvironmentVariable("GH_COPILOT_BYOK_DISABLE_MCP_COMPAT")
+        var disableCompat = (Environment.GetEnvironmentVariable("CBMS_DISABLE_MCP_COMPAT")
             ?? Environment.GetEnvironmentVariable("COPILOTX_DISABLE_MCP_COMPAT")
             ?? string.Empty)
             .Trim()
@@ -1335,9 +1335,9 @@ class Program
             AnsiConsole.MarkupLine("  --mode each|all            Prompt per deployment or add all");
             AnsiConsole.MarkupLine("  --all                      Add all discovered deployments without prompts\n");
             AnsiConsole.MarkupLine("[cyan]Examples:[/]");
-            AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry --mode each");
-            AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry --all");
-            AnsiConsole.MarkupLine("  gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all");
+            AnsiConsole.MarkupLine("  copilot-byok-model-switcher import-foundry --mode each");
+            AnsiConsole.MarkupLine("  copilot-byok-model-switcher import-foundry --all");
+            AnsiConsole.MarkupLine("  copilot-byok-model-switcher import-foundry --account myfoundry --resource-group my-rg --all");
             return 0;
         }
 

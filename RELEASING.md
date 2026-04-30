@@ -1,12 +1,12 @@
-# Releasing gh-copilot-byok
+﻿# Releasing copilot-byok-model-switcher
 
-This project publishes the .NET global tool package `gh-copilot-byok` to both NuGet.org and GitHub Packages (NuGet registry).
+This project publishes the .NET global tool package `copilot-byok-model-switcher` to both NuGet.org and GitHub Packages (NuGet registry).
 
 ## One-time setup
 
 1. Ensure package metadata is correct in `dotnet/CopilotX/CopilotX.csproj`.
 2. Ensure workflow permissions include `packages: write` (already configured).
-3. Add a `NUGET_API_KEY` repository secret with an API key from [nuget.org](https://www.nuget.org/) that has push permissions for the `gh-copilot-byok` package.
+3. Add a `NUGET_API_KEY` repository secret with an API key from [nuget.org](https://www.nuget.org/) that has push permissions for the `copilot-byok-model-switcher` package.
 
 ## Release workflow
 
@@ -28,13 +28,13 @@ This project publishes the .NET global tool package `gh-copilot-byok` to both Nu
 ### From NuGet.org (recommended — no authentication required)
 
 ```powershell
-dotnet tool install --global gh-copilot-byok
+dotnet tool install --global copilot-byok-model-switcher
 ```
 
 If already installed:
 
 ```powershell
-dotnet tool update --global gh-copilot-byok
+dotnet tool update --global copilot-byok-model-switcher
 ```
 
 ### From GitHub Packages (alternative)
@@ -55,14 +55,46 @@ dotnet nuget add source "https://nuget.pkg.github.com/sujithq/index.json" `
 3. Install the tool:
 
 ```powershell
-dotnet tool install --global gh-copilot-byok --add-source "https://nuget.pkg.github.com/sujithq/index.json"
+dotnet tool install --global copilot-byok-model-switcher --add-source "https://nuget.pkg.github.com/sujithq/index.json"
 ```
 
 If already installed:
 
 ```powershell
-dotnet tool update --global gh-copilot-byok --add-source "https://nuget.pkg.github.com/sujithq/index.json"
+dotnet tool update --global copilot-byok-model-switcher --add-source "https://nuget.pkg.github.com/sujithq/index.json"
 ```
+
+## Migrating from the old `gh-copilot-byok` package
+
+The package was previously published as `gh-copilot-byok`. To remove it and install the renamed package:
+
+```powershell
+# Uninstall old package
+dotnet tool uninstall --global gh-copilot-byok
+
+# Install new package
+dotnet tool install --global copilot-byok-model-switcher
+```
+
+**Config directory migration** — the config directory moved from `~/.gh-copilot-byok/` to `~/.copilot-byok-model-switcher/`. Copy existing profiles across:
+
+```powershell
+# PowerShell
+Copy-Item -Recurse "$HOME\.gh-copilot-byok" "$HOME\.copilot-byok-model-switcher"
+```
+
+```bash
+# bash/zsh
+cp -r ~/.gh-copilot-byok ~/.copilot-byok-model-switcher
+```
+
+**Environment variable renames** (update any shell profiles / CI variables):
+
+| Old name | New name |
+|---|---|
+| `GH_COPILOT_BYOK_CONFIG_DIR` | `COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR` |
+| `GH_COPILOT_BYOK_CONFIG_SCOPE` | `COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE` |
+| `GH_COPILOT_BYOK_DISABLE_MCP_COMPAT` | `CBMS_DISABLE_MCP_COMPAT` |
 
 ## Dry run checks (local)
 

@@ -1,4 +1,4 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -8,24 +8,24 @@ const config = require('../config');
 const foundry = require('../foundry');
 
 function withIsolatedConfigDir(t) {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gh-copilot-byok-node-test-'));
-  const previousDir = process.env.GH_COPILOT_BYOK_CONFIG_DIR;
-  const previousScope = process.env.GH_COPILOT_BYOK_CONFIG_SCOPE;
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-byok-model-switcher-node-test-'));
+  const previousDir = process.env.COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR;
+  const previousScope = process.env.COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE;
 
-  process.env.GH_COPILOT_BYOK_CONFIG_DIR = tempDir;
-  process.env.GH_COPILOT_BYOK_CONFIG_SCOPE = 'global';
+  process.env.COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR = tempDir;
+  process.env.COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE = 'global';
 
   t.after(() => {
     if (previousDir === undefined) {
-      delete process.env.GH_COPILOT_BYOK_CONFIG_DIR;
+      delete process.env.COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR;
     } else {
-      process.env.GH_COPILOT_BYOK_CONFIG_DIR = previousDir;
+      process.env.COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR = previousDir;
     }
 
     if (previousScope === undefined) {
-      delete process.env.GH_COPILOT_BYOK_CONFIG_SCOPE;
+      delete process.env.COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE;
     } else {
-      process.env.GH_COPILOT_BYOK_CONFIG_SCOPE = previousScope;
+      process.env.COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE = previousScope;
     }
 
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -35,15 +35,15 @@ function withIsolatedConfigDir(t) {
 }
 
 function withoutConfigDirOverride(t) {
-  const previousDir = process.env.GH_COPILOT_BYOK_CONFIG_DIR;
+  const previousDir = process.env.COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR;
 
-  delete process.env.GH_COPILOT_BYOK_CONFIG_DIR;
+  delete process.env.COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR;
 
   t.after(() => {
     if (previousDir === undefined) {
-      delete process.env.GH_COPILOT_BYOK_CONFIG_DIR;
+      delete process.env.COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR;
     } else {
-      process.env.GH_COPILOT_BYOK_CONFIG_DIR = previousDir;
+      process.env.COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR = previousDir;
     }
   });
 }
@@ -56,22 +56,22 @@ test('sanitizeSegment normalizes unsupported characters', () => {
 test('resolveConfigFileFor uses global config when scope is global', (t) => {
   withoutConfigDirOverride(t);
 
-  const pathValue = config.__test.resolveConfigFileFor('global', 'tenant__user', path.join(os.tmpdir(), '.gh-copilot-byok'));
-  assert.match(pathValue, /[\\/]\.gh-copilot-byok[\\/]config\.json$/);
+  const pathValue = config.__test.resolveConfigFileFor('global', 'tenant__user', path.join(os.tmpdir(), '.copilot-byok-model-switcher'));
+  assert.match(pathValue, /[\\/]\.copilot-byok-model-switcher[\\/]config\.json$/);
 });
 
 test('resolveConfigFileFor uses user-scoped config when identity is present', (t) => {
   withoutConfigDirOverride(t);
 
-  const pathValue = config.__test.resolveConfigFileFor('auto', 'tenant__user', path.join(os.tmpdir(), '.gh-copilot-byok'));
-  assert.match(pathValue, /[\\/]\.gh-copilot-byok[\\/]config\.tenant__user\.json$/);
+  const pathValue = config.__test.resolveConfigFileFor('auto', 'tenant__user', path.join(os.tmpdir(), '.copilot-byok-model-switcher'));
+  assert.match(pathValue, /[\\/]\.copilot-byok-model-switcher[\\/]config\.tenant__user\.json$/);
 });
 
 test('resolveConfigFileFor falls back to global when identity is missing', (t) => {
   withoutConfigDirOverride(t);
 
-  const pathValue = config.__test.resolveConfigFileFor('azure-user', null, path.join(os.tmpdir(), '.gh-copilot-byok'));
-  assert.match(pathValue, /[\\/]\.gh-copilot-byok[\\/]config\.json$/);
+  const pathValue = config.__test.resolveConfigFileFor('azure-user', null, path.join(os.tmpdir(), '.copilot-byok-model-switcher'));
+  assert.match(pathValue, /[\\/]\.copilot-byok-model-switcher[\\/]config\.json$/);
 });
 
 test('loadConfig creates default config file in isolated directory', (t) => {
