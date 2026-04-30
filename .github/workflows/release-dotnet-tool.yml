@@ -1,4 +1,4 @@
-﻿name: Release .NET Tool
+name: Release .NET Tool
 
 on:
   release:
@@ -33,7 +33,7 @@ jobs:
       TEST_PROJECT_PATH: dotnet/CopilotX.Tests/CopilotX.Tests.csproj
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_tag || github.event.release.tag_name }}
 
