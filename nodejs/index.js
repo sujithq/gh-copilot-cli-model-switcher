@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
@@ -314,7 +314,7 @@ async function promptMcpCompatServers(previousSelection) {
 }
 
 function buildCopilotArgs(profile, copilotArgs = []) {
-  const disableCompat = (process.env.GH_COPILOT_BYOK_DISABLE_MCP_COMPAT || process.env.COPILOTX_DISABLE_MCP_COMPAT || '').trim().toLowerCase() === 'off';
+  const disableCompat = (process.env.CBMS_DISABLE_MCP_COMPAT || process.env.COPILOTX_DISABLE_MCP_COMPAT || '').trim().toLowerCase() === 'off';
   const args = [...copilotArgs];
 
   const hasPromptMode = args.includes('-p') || args.includes('--prompt');
@@ -625,7 +625,7 @@ async function executeWithProfile(profileName, copilotArgs = []) {
 
   if (!profile) {
     console.error(`Profile "${profileName}" not found.`);
-    console.error('Use "gh-copilot-byok list" to see available profiles.');
+    console.error('Use "copilot-byok-model-switcher list" to see available profiles.');
     return 1;
   }
 
@@ -645,7 +645,7 @@ async function executeWithProfile(profileName, copilotArgs = []) {
   const userRequestedInteractive = copilotArgs.length === 0;
 
   // For Azure BYOK profiles in interactive mode, prompt for MCP servers to disable on first use.
-  const needsCompat = !((process.env.GH_COPILOT_BYOK_DISABLE_MCP_COMPAT || process.env.COPILOTX_DISABLE_MCP_COMPAT || '').trim().toLowerCase() === 'off')
+  const needsCompat = !((process.env.CBMS_DISABLE_MCP_COMPAT || process.env.COPILOTX_DISABLE_MCP_COMPAT || '').trim().toLowerCase() === 'off')
     && (profile.type === 'byok' || profile.type === 'proxy') && isAzureProfile(profile);
   const hasManualMcpControls = copilotArgs.some((a) =>
     a === '--disable-mcp-server' || a === '--disable-builtin-mcps' || a === '--available-tools'
@@ -822,7 +822,7 @@ async function runAddProfileWizard() {
 }
 
 const argv = yargs(hideBin(process.argv))
-  .scriptName('gh-copilot-byok')
+  .scriptName('copilot-byok-model-switcher')
   .usage('$0 <command> [options]')
   .command(
     'list',

@@ -1,4 +1,4 @@
-name: Release .NET Tool
+﻿name: Release .NET Tool
 
 on:
   release:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Release tag to publish (for example, gh-copilot-byok-v1.1.0 or v1.1.0)
+        description: Release tag to publish (for example, copilot-byok-model-switcher-v1.1.0 or v1.1.0)
         required: true
         type: string
 
@@ -52,7 +52,7 @@ jobs:
             TAG="$DISPATCH_TAG"
           fi
 
-          # Support both v1.2.3 and gh-copilot-byok-v1.2.3 tag formats.
+          # Support both v1.2.3 and copilot-byok-model-switcher-v1.2.3 tag formats.
           VERSION="${TAG##*-v}"
           VERSION="${VERSION#v}"
 

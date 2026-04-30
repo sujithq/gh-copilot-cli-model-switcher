@@ -1,4 +1,4 @@
-using CopilotX;
+﻿using CopilotX;
 using System.Text.Json;
 using Xunit;
 
@@ -12,18 +12,18 @@ public class ConfigManagerTests : IDisposable
 
     public ConfigManagerTests()
     {
-        _tempConfigDir = Path.Combine(Path.GetTempPath(), $"gh-copilot-byok-dotnet-test-{Guid.NewGuid():N}");
-        _previousScope = Environment.GetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_SCOPE");
-        _previousConfigDir = Environment.GetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_DIR");
+        _tempConfigDir = Path.Combine(Path.GetTempPath(), $"copilot-byok-model-switcher-dotnet-test-{Guid.NewGuid():N}");
+        _previousScope = Environment.GetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE");
+        _previousConfigDir = Environment.GetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR");
 
-        Environment.SetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_SCOPE", "global");
-        Environment.SetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_DIR", _tempConfigDir);
+        Environment.SetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE", "global");
+        Environment.SetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR", _tempConfigDir);
     }
 
     public void Dispose()
     {
-        Environment.SetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_SCOPE", _previousScope);
-        Environment.SetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_DIR", _previousConfigDir);
+        Environment.SetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE", _previousScope);
+        Environment.SetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR", _previousConfigDir);
 
         if (Directory.Exists(_tempConfigDir))
         {
@@ -34,25 +34,25 @@ public class ConfigManagerTests : IDisposable
     [Fact]
     public void ResolveConfigFileFor_UsesGlobalWhenScopeGlobal()
     {
-        var path = ConfigManager.ResolveConfigFileFor("/tmp/gh-copilot-byok", "global", "tenant__user");
+        var path = ConfigManager.ResolveConfigFileFor("/tmp/copilot-byok-model-switcher", "global", "tenant__user");
 
-        Assert.Equal("/tmp/gh-copilot-byok/config.json", path.Replace('\\', '/'));
+        Assert.Equal("/tmp/copilot-byok-model-switcher/config.json", path.Replace('\\', '/'));
     }
 
     [Fact]
     public void ResolveConfigFileFor_UsesAzureUserScopedWhenIdentityPresent()
     {
-        var path = ConfigManager.ResolveConfigFileFor("/tmp/gh-copilot-byok", "auto", "tenant123__user_contoso.com");
+        var path = ConfigManager.ResolveConfigFileFor("/tmp/copilot-byok-model-switcher", "auto", "tenant123__user_contoso.com");
 
-        Assert.Equal("/tmp/gh-copilot-byok/config.tenant123__user_contoso.com.json", path.Replace('\\', '/'));
+        Assert.Equal("/tmp/copilot-byok-model-switcher/config.tenant123__user_contoso.com.json", path.Replace('\\', '/'));
     }
 
     [Fact]
     public void ResolveConfigFileFor_FallsBackToGlobalWhenIdentityMissing()
     {
-        var path = ConfigManager.ResolveConfigFileFor("/tmp/gh-copilot-byok", "azure-user", null);
+        var path = ConfigManager.ResolveConfigFileFor("/tmp/copilot-byok-model-switcher", "azure-user", null);
 
-        Assert.Equal("/tmp/gh-copilot-byok/config.json", path.Replace('\\', '/'));
+        Assert.Equal("/tmp/copilot-byok-model-switcher/config.json", path.Replace('\\', '/'));
     }
 
     [Fact]

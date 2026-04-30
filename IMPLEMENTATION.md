@@ -1,8 +1,8 @@
-# gh-copilot-byok - Implementation Summary
+﻿# copilot-byok-model-switcher - Implementation Summary
 
 ## ✅ Completed Implementation
 
-This repository now contains a complete implementation of the gh-copilot-byok CLI tool as specified in the design requirements. Two fully functional implementations have been created:
+This repository now contains a complete implementation of the copilot-byok-model-switcher CLI tool as specified in the design requirements. Two fully functional implementations have been created:
 
 ### 1. Node.js Implementation
 **Location**: `/nodejs`
@@ -21,7 +21,7 @@ This repository now contains a complete implementation of the gh-copilot-byok CL
 - ✅ Azure CLI token auth mode for keyless Azure RBAC profiles
 - ✅ Auto-detect Azure profiles in token `auto` mode when API key is absent
 - ✅ One-time retry with token refresh on auth/token expiry failures
-- ✅ Config persistence in `~/.gh-copilot-byok/config.json`
+- ✅ Config persistence in `~/.copilot-byok-model-switcher/config.json`
 - ✅ Support for copilot, byok, and proxy profile types
 - ✅ Argument forwarding to `gh copilot`
 - ✅ Error handling and user-friendly messages
@@ -76,18 +76,18 @@ This repository now contains a complete implementation of the gh-copilot-byok CL
 ### Core Requirements ✅
 
 1. **Easy switching between models** ✅
-   - `gh-copilot-byok use <profile>` command
-   - Quick access with `gh-copilot-byok last`
-   - Switch to default with `gh-copilot-byok default`
+   - `copilot-byok-model-switcher use <profile>` command
+   - Quick access with `copilot-byok-model-switcher last`
+   - Switch to default with `copilot-byok-model-switcher default`
 
 2. **Persist configurations locally** ✅
-   - Config stored in `~/.gh-copilot-byok/config.json`
+   - Config stored in `~/.copilot-byok-model-switcher/config.json`
    - Automatic creation of config directory
    - JSON format for easy editing
 
 3. **Reuse previous configurations** ✅
    - `lastUsed` tracking
-   - `gh-copilot-byok last` command
+   - `copilot-byok-model-switcher last` command
    - Profile history maintained
 
 4. **Support enterprise scenarios** ✅
@@ -137,7 +137,7 @@ All required environment variables are set:
 ### Component Structure
 
 ```
-gh-copilot-byok
+copilot-byok-model-switcher
 ├── nodejs/                 # Node.js implementation
 │   ├── index.js           # Main CLI app
 │   ├── config.js          # Config manager
@@ -202,7 +202,7 @@ npm link
 ```bash
 cd dotnet/CopilotX
 dotnet pack
-dotnet tool install --global --add-source ./nupkg gh-copilot-byok
+dotnet tool install --global --add-source ./nupkg copilot-byok-model-switcher
 ```
 
 ## 🧪 Testing Performed
@@ -246,19 +246,19 @@ Both implementations are:
 
 ```bash
 # List profiles
-gh-copilot-byok list
+copilot-byok-model-switcher list
 
 # Add new profile
-gh-copilot-byok add
+copilot-byok-model-switcher add
 
 # Use specific profile
-gh-copilot-byok use azure-gpt4 -p "create a function"
+copilot-byok-model-switcher use azure-gpt4 -p "create a function"
 
 # Use last profile
-gh-copilot-byok last -p "this code"
+copilot-byok-model-switcher last -p "this code"
 
 # Switch to default
-gh-copilot-byok default
+copilot-byok-model-switcher default
 ```
 
 ## 🎨 Highlights

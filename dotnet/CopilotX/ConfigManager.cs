@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Diagnostics;
 
@@ -57,7 +57,7 @@ public class ConfigManager
 
     private static readonly string DefaultConfigDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".gh-copilot-byok"
+        ".copilot-byok-model-switcher"
     );
 
     private static readonly string LegacyConfigDir = Path.Combine(
@@ -67,7 +67,7 @@ public class ConfigManager
 
     private static string GetConfigDir()
     {
-        var configured = Environment.GetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_DIR")
+        var configured = Environment.GetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR")
             ?? Environment.GetEnvironmentVariable("COPILOTX_CONFIG_DIR");
 
         if (!string.IsNullOrWhiteSpace(configured))
@@ -181,7 +181,7 @@ public class ConfigManager
     private static string ResolveConfigFile()
     {
         var configDir = GetConfigDir();
-        var scope = (Environment.GetEnvironmentVariable("GH_COPILOT_BYOK_CONFIG_SCOPE")
+        var scope = (Environment.GetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE")
             ?? Environment.GetEnvironmentVariable("COPILOTX_CONFIG_SCOPE")
             ?? "auto").ToLowerInvariant();
         var identityKey = GetAzureIdentityKey();

@@ -1,10 +1,10 @@
-# GitHub Copilot CLI Model Switcher (gh-copilot-byok)
+﻿# GitHub Copilot CLI Model Switcher (copilot-byok-model-switcher)
 
 A lightweight CLI wrapper ("minitool") around GitHub Copilot CLI that enables easy switching between default Copilot models and custom BYOK (Bring Your Own Key) models.
 
 ## 🎯 Overview
 
-gh-copilot-byok allows you to:
+copilot-byok-model-switcher allows you to:
 
 - ✅ Easily switch between default Copilot and custom models
 - ✅ Persist model configurations locally
@@ -39,7 +39,7 @@ Both implementations share the same configuration format and provide identical f
 cd nodejs
 npm install
 npm link
-gh-copilot-byok list
+copilot-byok-model-switcher list
 ```
 
 ## ✅ Testing
@@ -73,32 +73,32 @@ The `.NET` test project uses xUnit with a lightweight console test runner.
 ```bash
 cd dotnet/CopilotX
 dotnet pack
-dotnet tool install --global --add-source ./nupkg gh-copilot-byok
-gh-copilot-byok list
+dotnet tool install --global --add-source ./nupkg copilot-byok-model-switcher
+copilot-byok-model-switcher list
 ```
 
 ### Install from NuGet.org (recommended)
 
 ```bash
-dotnet tool install --global gh-copilot-byok
+dotnet tool install --global copilot-byok-model-switcher
 ```
 
 Update an existing installation:
 
 ```bash
-dotnet tool update --global gh-copilot-byok
+dotnet tool update --global copilot-byok-model-switcher
 ```
 
 ### Install from GitHub Packages (alternative — requires authentication)
 
 ```bash
-dotnet tool install --global gh-copilot-byok --add-source "https://nuget.pkg.github.com/sujithq/index.json"
+dotnet tool install --global copilot-byok-model-switcher --add-source "https://nuget.pkg.github.com/sujithq/index.json"
 ```
 
 Update an existing installation:
 
 ```bash
-dotnet tool update --global gh-copilot-byok --add-source "https://nuget.pkg.github.com/sujithq/index.json"
+dotnet tool update --global copilot-byok-model-switcher --add-source "https://nuget.pkg.github.com/sujithq/index.json"
 ```
 
 ## 🎮 Usage
@@ -107,29 +107,29 @@ All commands are identical across both implementations:
 
 ```bash
 # List available profiles (interactive menu: select #, then press Enter to use)
-gh-copilot-byok list
-gh-copilot-byok list
+copilot-byok-model-switcher list
+copilot-byok-model-switcher list
 
 # Use a specific profile
-gh-copilot-byok use azure-gpt
+copilot-byok-model-switcher use azure-gpt
 
 # Add a new profile
-gh-copilot-byok add
+copilot-byok-model-switcher add
 
 # Use last profile
-gh-copilot-byok last
+copilot-byok-model-switcher last
 
 # Use default Copilot
-gh-copilot-byok default
+copilot-byok-model-switcher default
 
 # Import profiles from Foundry / Azure OpenAI / Azure AI Services deployments
-gh-copilot-byok import-foundry --mode each
+copilot-byok-model-switcher import-foundry --mode each
 
 # Import all discovered deployments from all applicable accounts
-gh-copilot-byok import-foundry --all
+copilot-byok-model-switcher import-foundry --all
 
 # Import from one account/resource group
-gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all
+copilot-byok-model-switcher import-foundry --account myfoundry --resource-group my-rg --all
 ```
 
 ## 🚢 Release Readiness
@@ -176,9 +176,9 @@ GitHub Copilot CLI can connect to external models via environment variables:
 - `COPILOT_MODEL`
 - `COPILOT_PROVIDER_TYPE`
 
-gh-copilot-byok can now source Azure CLI access tokens when API keys are disabled. In token mode, it sets `COPILOT_PROVIDER_BEARER_TOKEN` and clears `COPILOT_PROVIDER_API_KEY` to avoid auth-mode ambiguity.
+copilot-byok-model-switcher can now source Azure CLI access tokens when API keys are disabled. In token mode, it sets `COPILOT_PROVIDER_BEARER_TOKEN` and clears `COPILOT_PROVIDER_API_KEY` to avoid auth-mode ambiguity.
 
-For Azure BYOK profiles, gh-copilot-byok also enables an MCP compatibility mode by default to avoid provider tool-count limits (e.g. `tools array too long`). It launches `gh copilot` with MCP-disable flags for common high-volume servers. Set `GH_COPILOT_BYOK_DISABLE_MCP_COMPAT=off` to opt out.
+For Azure BYOK profiles, copilot-byok-model-switcher also enables an MCP compatibility mode by default to avoid provider tool-count limits (e.g. `tools array too long`). It launches `gh copilot` with MCP-disable flags for common high-volume servers. Set `CBMS_DISABLE_MCP_COMPAT=off` to opt out.
 
 This allows connecting to:
 - OpenAI
@@ -201,17 +201,17 @@ Any model used must support:
 
 ## 📝 Configuration
 
-Profiles are stored in an active config file under `~/.gh-copilot-byok/`.
+Profiles are stored in an active config file under `~/.copilot-byok-model-switcher/`.
 
 Config scope behavior:
-- `GH_COPILOT_BYOK_CONFIG_SCOPE=auto` (default): use Azure user-scoped config when `az account show` is available, otherwise global config
-- `GH_COPILOT_BYOK_CONFIG_SCOPE=azure-user`: always use Azure user-scoped config
-- `GH_COPILOT_BYOK_CONFIG_SCOPE=global`: always use `~/.gh-copilot-byok/config.json`
+- `COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE=auto` (default): use Azure user-scoped config when `az account show` is available, otherwise global config
+- `COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE=azure-user`: always use Azure user-scoped config
+- `COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE=global`: always use `~/.copilot-byok-model-switcher/config.json`
 
 In Azure user-scoped mode, file name format is:
-- `~/.gh-copilot-byok/config.<tenantId>__<userName>.json`
+- `~/.copilot-byok-model-switcher/config.<tenantId>__<userName>.json`
 
-Use `gh-copilot-byok list` to see which config file is currently active.
+Use `copilot-byok-model-switcher list` to see which config file is currently active.
 
 Example JSON content:
 
@@ -318,7 +318,7 @@ The proxy handles:
 
 ### Azure OpenAI with RBAC (No API Keys, Local Wrapper)
 
-For environments where API keys are disabled, gh-copilot-byok can acquire an Entra token directly using Azure CLI:
+For environments where API keys are disabled, copilot-byok-model-switcher can acquire an Entra token directly using Azure CLI:
 
 ```json
 {
@@ -389,7 +389,7 @@ export COPILOT_MODEL=<model>
 gh copilot
 ```
 
-gh-copilot-byok handles this switching automatically based on the selected profile.
+copilot-byok-model-switcher handles this switching automatically based on the selected profile.
 
 ## 🧭 Import From Foundry
 
@@ -404,16 +404,16 @@ Examples:
 
 ```bash
 # Scan all accounts and prompt per deployment
-gh-copilot-byok import-foundry --mode each
+copilot-byok-model-switcher import-foundry --mode each
 
 # Scan all accounts and add all discovered deployments
-gh-copilot-byok import-foundry --all
+copilot-byok-model-switcher import-foundry --all
 
 # Target one account/resource group
-gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --mode each
+copilot-byok-model-switcher import-foundry --account myfoundry --resource-group my-rg --mode each
 
 # Scope by subscription
-gh-copilot-byok import-foundry --subscription <subscription-id> --all
+copilot-byok-model-switcher import-foundry --subscription <subscription-id> --all
 ```
 
 ## 📚 Examples
@@ -422,13 +422,13 @@ gh-copilot-byok import-foundry --subscription <subscription-id> --all
 
 #### Node.js Version
 ```bash
-gh-copilot-byok add
+copilot-byok-model-switcher add
 # Follow the interactive prompts
 ```
 
 #### .NET Version (with Spectre.Console)
 ```bash
-gh-copilot-byok add
+copilot-byok-model-switcher add
 # Beautiful interactive prompts with selection menus
 # Secure password input for API keys
 ```
@@ -437,19 +437,19 @@ gh-copilot-byok add
 
 ```bash
 # List all profiles
-gh-copilot-byok list
+copilot-byok-model-switcher list
 
 # Use Azure profile with Copilot prompt mode
-gh-copilot-byok use azure-gpt -p "create a function to sort an array"
+copilot-byok-model-switcher use azure-gpt -p "create a function to sort an array"
 
 # Use Ollama for local inference
-gh-copilot-byok use ollama-local -p "what is this code"
+copilot-byok-model-switcher use ollama-local -p "what is this code"
 
 # Quick access to last used profile
-gh-copilot-byok last -p "how to debug this"
+copilot-byok-model-switcher last -p "how to debug this"
 
 # Switch back to default
-gh-copilot-byok default
+copilot-byok-model-switcher default
 ```
 
 ## 🛠️ Architecture
@@ -481,7 +481,7 @@ Return Result
 
 1. **Use Environment Variables**: Store API keys in environment variables, not directly in config
 2. **API Key Security**: Use `apiKeyEnv` instead of `apiKey` in profiles
-3. **File Permissions**: Ensure `~/.gh-copilot-byok/config.json` has appropriate permissions
+3. **File Permissions**: Ensure `~/.copilot-byok-model-switcher/config.json` has appropriate permissions
 4. **Enterprise RBAC**: Use proxy layer for token-based authentication
 5. **Identity Separation**: Azure user-scoped config keeps profiles separate when switching users with `az login`
 
