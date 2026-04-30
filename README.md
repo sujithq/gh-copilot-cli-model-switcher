@@ -1,4 +1,4 @@
-﻿# GitHub Copilot CLI Model Switcher (copilot-byok-model-switcher)
+﻿# GitHub Copilot CLI Model Switcher (rename from gh-copilot-byok => copilot-byok-model-switcher)
 
 A lightweight CLI wrapper ("minitool") around GitHub Copilot CLI that enables easy switching between default Copilot models and custom BYOK (Bring Your Own Key) models.
 
