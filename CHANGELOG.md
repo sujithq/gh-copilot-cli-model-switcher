@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.1](https://github.com/sujithq/gh-copilot-cli-model-switcher/compare/copilot-byok-model-switcher-v2.0.0...copilot-byok-model-switcher-v2.0.1) (2026-05-01)
+
+
+### Bug Fixes
+
+* chain release-dotnet-tool workflow from release-please via workflow_call ([98c3c13](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/98c3c13e38b7a82b0d2d2592bf1599a4954a63f0))
+* remove UTF-8 BOM and fix actions/checkout version in release-dotnet-tool.yml ([7c0657b](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/7c0657b29ae94b2ffe65f02046c8f2772001fa58))
+* resolve Release Please startup_failure - make NUGET_API_KEY optional and add packages:write permission ([d953f56](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/d953f56d09914137b658b9d1a31d72be46c11a34))
+
 ## [2.0.0](https://github.com/sujithq/gh-copilot-cli-model-switcher/compare/copilot-byok-model-switcher-v1.1.1...copilot-byok-model-switcher-v2.0.0) (2026-04-30)
 
 
