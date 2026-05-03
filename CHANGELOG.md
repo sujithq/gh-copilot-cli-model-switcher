@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.0](https://github.com/sujithq/gh-copilot-cli-model-switcher/compare/copilot-byok-model-switcher-v2.1.0...copilot-byok-model-switcher-v2.2.0) (2026-05-03)
+
+
+### Features
+
+* enhance release workflow by resolving tag references and updating descriptions for release_tag input ([6d987a9](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/6d987a9362ab4bcd24a17dbf9c0195f7cc996085))
+* improve tag resolution in release workflow by enhancing error handling and adjusting tag prefix logic ([f473b27](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/f473b277a6f6439e842f2f8b893e66edeba50cdb))
+
 ## [2.1.0](https://github.com/sujithq/gh-copilot-cli-model-switcher/compare/copilot-byok-model-switcher-v2.0.1...copilot-byok-model-switcher-v2.1.0) (2026-05-03)
 
 
