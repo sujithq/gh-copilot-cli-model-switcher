@@ -1,7 +1,5 @@
 # GitHub Copilot CLI Model Switcher (rename from gh-copilot-byok => copilot-byok-model-switcher)
 
-upptime).
-
 [![gh-copilot-byok](https://img.shields.io/nuget/v/gh-copilot-byok.svg)](https://www.nuget.org/packages/gh-copilot-byok)
 [![gh-copilot-byok](https://img.shields.io/nuget/dt/gh-copilot-byok)](https://www.nuget.org/packages/gh-copilot-byok)
 [![dotnet tool](https://img.shields.io/badge/.NET-Global%20Tool-blue)]()
