@@ -32,23 +32,25 @@ jobs:
       PROJECT_PATH: dotnet/CopilotX/CopilotX.csproj
       TEST_PROJECT_PATH: dotnet/CopilotX.Tests/CopilotX.Tests.csproj
     steps:
-      - name: Checkout config
+      - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          sparse-checkout: release-please-config.json
-          sparse-checkout-cone-mode: false
 
       - name: Resolve tag reference
         id: resolve_tag
         run: |
           INPUT_TAG="${{ inputs.release_tag || github.event.release.tag_name }}"
+
+          PACKAGE_NAME=$(python3 -c "import json; print(json.load(open('release-please-config.json'))['packages']['.']['package-name'])")
+          if [ -z "$PACKAGE_NAME" ]; then
+            echo "::error::Could not read package-name from release-please-config.json"
+            exit 1
+          fi
           
-          # Extract package name from release-please-config.json
-          PACKAGE_NAME=$(jq -r '.packages["."]["package-name"]' release-please-config.json)
-          
-          # If input looks like a bare semantic version (e.g., 2.1.0), prepend the full tag prefix
+          # Build full tag from package-name when users provide a short version.
           if [[ "$INPUT_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             FULL_TAG="$PACKAGE_NAME-v$INPUT_TAG"
+          elif [[ "$INPUT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            FULL_TAG="$PACKAGE_NAME-$INPUT_TAG"
           else
             FULL_TAG="$INPUT_TAG"
           fi
@@ -56,7 +58,7 @@ jobs:
           echo "tag=$FULL_TAG" >> "$GITHUB_OUTPUT"
           echo "Resolved tag: $FULL_TAG"
 
-      - name: Checkout
+      - name: Checkout release ref
         uses: actions/checkout@v6
         with:
           ref: ${{ steps.resolve_tag.outputs.tag }}
