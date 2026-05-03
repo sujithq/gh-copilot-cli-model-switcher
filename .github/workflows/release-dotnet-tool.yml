@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Release tag to publish (for example, copilot-byok-model-switcher-v1.1.0 or v1.1.0)
+        description: Release tag to publish (e.g., 2.1.0, v2.1.0, or copilot-byok-model-switcher-v2.1.0)
         required: true
         type: string
   workflow_call:
     inputs:
       release_tag:
-        description: Release tag to publish (for example, copilot-byok-model-switcher-v1.1.0 or v1.1.0)
+        description: Release tag to publish (e.g., 2.1.0, v2.1.0, or copilot-byok-model-switcher-v2.1.0)
         required: true
         type: string
     secrets:
@@ -32,10 +32,34 @@ jobs:
       PROJECT_PATH: dotnet/CopilotX/CopilotX.csproj
       TEST_PROJECT_PATH: dotnet/CopilotX.Tests/CopilotX.Tests.csproj
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout config
+        uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release_tag || github.event.release.tag_name }}
+          sparse-checkout: release-please-config.json
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve tag reference
+        id: resolve_tag
+        run: |
+          INPUT_TAG="${{ inputs.release_tag || github.event.release.tag_name }}"
+          
+          # Extract package name from release-please-config.json
+          PACKAGE_NAME=$(jq -r '.packages["."]["package-name"]' release-please-config.json)
+          
+          # If input looks like a bare semantic version (e.g., 2.1.0), prepend the full tag prefix
+          if [[ "$INPUT_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            FULL_TAG="$PACKAGE_NAME-v$INPUT_TAG"
+          else
+            FULL_TAG="$INPUT_TAG"
+          fi
+          
+          echo "tag=$FULL_TAG" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag: $FULL_TAG"
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.resolve_tag.outputs.tag }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -53,14 +77,8 @@ jobs:
 
       - name: Pack
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-          DISPATCH_TAG: ${{ inputs.release_tag }}
+          TAG: ${{ steps.resolve_tag.outputs.tag }}
         run: |
-          TAG="$RELEASE_TAG"
-          if [ -n "$DISPATCH_TAG" ]; then
-            TAG="$DISPATCH_TAG"
-          fi
-
           # Support both v1.2.3 and copilot-byok-model-switcher-v1.2.3 tag formats.
           VERSION="${TAG##*-v}"
           VERSION="${VERSION#v}"
@@ -94,7 +112,7 @@ jobs:
       - name: Upload release assets
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ inputs.release_tag || github.event.release.tag_name }}
+          tag_name: ${{ steps.resolve_tag.outputs.tag }}
           append_body: false
           files: |
             dotnet/CopilotX/nupkg/*.nupkg
