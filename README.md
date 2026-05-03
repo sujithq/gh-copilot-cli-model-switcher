@@ -1,4 +1,4 @@
-# GitHub Copilot CLI Model Switcher (rename from gh-copilot-byok => copilot-byok-model-switcher)
+# GitHub Copilot CLI Model Switcher
 
 [![gh-copilot-byok](https://img.shields.io/nuget/v/gh-copilot-byok.svg)](https://www.nuget.org/packages/gh-copilot-byok)
 [![gh-copilot-byok](https://img.shields.io/nuget/dt/gh-copilot-byok)](https://www.nuget.org/packages/gh-copilot-byok)
