@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/sujithq/gh-copilot-cli-model-switcher/compare/copilot-byok-model-switcher-v2.0.1...copilot-byok-model-switcher-v2.1.0) (2026-05-03)
+
+
+### Features
+
+* add optional release_tag input for manual publishing in Release Please workflow; update documentation accordingly ([5c62962](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/5c629620d901bb9cd0f8c438a82232f1d4304eae))
+
 ## [2.0.1](https://github.com/sujithq/gh-copilot-cli-model-switcher/compare/copilot-byok-model-switcher-v2.0.0...copilot-byok-model-switcher-v2.0.1) (2026-05-01)
 
 
