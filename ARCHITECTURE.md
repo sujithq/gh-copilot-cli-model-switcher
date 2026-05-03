@@ -1,4 +1,4 @@
-﻿# copilot-byok-model-switcher Architecture & Design
+# copilot-byok-model-switcher Architecture & Design
 
 ## 🎯 Design Goals
 
@@ -179,7 +179,7 @@ Confirm Success
 ### Using a Profile
 
 ```
-Command: copilot-byok-model-switcher use azure-gpt -p "help"
+Command: gh-copilot-byok use azure-gpt -p "help"
     ↓
 Parse Arguments
     profile: "azure-gpt"
@@ -208,7 +208,7 @@ Return Exit Code
 ### Pattern 1: Direct API Key
 
 ```
-copilot-byok-model-switcher → GitHub Copilot CLI → Azure OpenAI (API Key)
+gh-copilot-byok → GitHub Copilot CLI → Azure OpenAI (API Key)
 ```
 
 **Use Case**: Environments where API keys are allowed
@@ -217,7 +217,7 @@ copilot-byok-model-switcher → GitHub Copilot CLI → Azure OpenAI (API Key)
 ### Pattern 2: RBAC with Proxy
 
 ```
-copilot-byok-model-switcher → GitHub Copilot CLI → Proxy → Azure OpenAI (RBAC)
+gh-copilot-byok → GitHub Copilot CLI → Proxy → Azure OpenAI (RBAC)
 ```
 
 **Use Case**: Enterprise environments with RBAC-only access
@@ -231,7 +231,7 @@ copilot-byok-model-switcher → GitHub Copilot CLI → Proxy → Azure OpenAI (R
 ### Pattern 2b: RBAC Local Wrapper (No API Keys)
 
 ```
-copilot-byok-model-switcher → Azure CLI token → GitHub Copilot CLI → Azure OpenAI (RBAC)
+gh-copilot-byok → Azure CLI token → GitHub Copilot CLI → Azure OpenAI (RBAC)
 ```
 
 **Use Case**: API keys disabled, local developer workflow
@@ -243,7 +243,7 @@ copilot-byok-model-switcher → Azure CLI token → GitHub Copilot CLI → Azure
 ### Pattern 3: Local Models
 
 ```
-copilot-byok-model-switcher → GitHub Copilot CLI → Ollama/vLLM → Local Model
+gh-copilot-byok → GitHub Copilot CLI → Ollama/vLLM → Local Model
 ```
 
 **Use Case**: Offline scenarios, privacy-sensitive environments
@@ -358,8 +358,8 @@ For local wrapper token mode:
 
 1. **Profile Templates**:
    ```
-   copilot-byok-model-switcher add --template azure
-   copilot-byok-model-switcher add --template ollama
+   gh-copilot-byok add --template azure
+   gh-copilot-byok add --template ollama
    ```
 
 2. **Per-Repository Profiles**:
@@ -370,14 +370,14 @@ For local wrapper token mode:
 
 3. **Shell Completion**:
    ```
-   copilot-byok-model-switcher completion bash
-   copilot-byok-model-switcher completion zsh
+   gh-copilot-byok completion bash
+   gh-copilot-byok completion zsh
    ```
 
 4. **Profile Import/Export**:
    ```
-   copilot-byok-model-switcher export azure-profile > azure.json
-   copilot-byok-model-switcher import azure.json
+   gh-copilot-byok export azure-profile > azure.json
+   gh-copilot-byok import azure.json
    ```
 
 5. **Model Routing**:
@@ -431,7 +431,7 @@ For local wrapper token mode:
 1. **Profile Not Found**:
    ```
    Error: Profile 'xyz' not found
-   Use 'copilot-byok-model-switcher list' to see available profiles.
+   Use 'gh-copilot-byok list' to see available profiles.
    ```
 
 2. **Missing API Key**:
@@ -467,7 +467,7 @@ For local wrapper token mode:
 ```
 Initial State (Default Profile)
     ↓
-User: copilot-byok-model-switcher use azure-gpt
+User: gh-copilot-byok use azure-gpt
     ↓
 Active State (Azure Profile)
     ↓

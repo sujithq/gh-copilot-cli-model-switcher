@@ -1,4 +1,4 @@
-﻿# copilot-byok-model-switcher - Node.js CLI
+# copilot-byok-model-switcher - Node.js CLI
 
 A lightweight Node.js CLI wrapper around GitHub Copilot CLI for easy model switching between default Copilot and custom BYOK models.
 
@@ -10,7 +10,7 @@ npm install
 npm link
 ```
 
-This will make the `copilot-byok-model-switcher` command available globally.
+This will make the `gh-copilot-byok` command available globally.
 
 ## Prerequisites
 
@@ -22,17 +22,17 @@ This will make the `copilot-byok-model-switcher` command available globally.
 ### List available profiles
 
 ```bash
-copilot-byok-model-switcher list
+gh-copilot-byok list
 ```
 
 Shows all configured profiles with details. The last used profile is marked with `*`.
 
-Read-only output. Use `copilot-byok-model-switcher manage` for interactive actions.
+Read-only output. Use `gh-copilot-byok manage` for interactive actions.
 
 ### Manage profiles (Use/Remove)
 
 ```bash
-copilot-byok-model-switcher manage
+gh-copilot-byok manage
 ```
 
 Single interactive flow to:
@@ -46,10 +46,10 @@ Single interactive flow to:
 ### Set or reset MCP compatibility servers
 
 ```bash
-copilot-byok-model-switcher mcp-compat <profile> [--action set|reset|all|none]
+gh-copilot-byok mcp-compat <profile> [--action set|reset|all|none]
 ```
 
-For Azure BYOK/proxy profiles, this controls which MCP servers copilot-byok-model-switcher disables automatically in compatibility mode.
+For Azure BYOK/proxy profiles, this controls which MCP servers gh-copilot-byok disables automatically in compatibility mode.
 
 - `set`: interactive server selection
 - `reset`: clear saved selection and prompt again on next interactive `use`
@@ -58,19 +58,19 @@ For Azure BYOK/proxy profiles, this controls which MCP servers copilot-byok-mode
 
 ```bash
 # Interactively set MCP compatibility servers
-copilot-byok-model-switcher mcp-compat foundry-myaccount-gpt-4-1
+gh-copilot-byok mcp-compat foundry-myaccount-gpt-4-1
 
 # Reset to prompt again on next interactive use
-copilot-byok-model-switcher mcp-compat foundry-myaccount-gpt-4-1 --action reset
+gh-copilot-byok mcp-compat foundry-myaccount-gpt-4-1 --action reset
 
 # Disable none
-copilot-byok-model-switcher mcp-compat foundry-myaccount-gpt-4-1 --action none
+gh-copilot-byok mcp-compat foundry-myaccount-gpt-4-1 --action none
 ```
 
 ### Use a specific profile
 
 ```bash
-copilot-byok-model-switcher use <profile> [copilot-args..]
+gh-copilot-byok use <profile> [copilot-args..]
 ```
 
 Switch to a profile and run GitHub Copilot CLI with that configuration. Without extra arguments, launches `gh copilot` in interactive mode.
@@ -81,21 +81,21 @@ All arguments after the profile name are forwarded directly to `gh copilot`.
 
 ```bash
 # Interactive mode
-copilot-byok-model-switcher use azure-gpt
+gh-copilot-byok use azure-gpt
 
 # Prompt mode examples
-copilot-byok-model-switcher use azure-gpt -p "how to list files"
-copilot-byok-model-switcher use ollama-local -p "what is this code doing"
+gh-copilot-byok use azure-gpt -p "how to list files"
+gh-copilot-byok use ollama-local -p "what is this code doing"
 
 # Non-interactive prompt (-p / --prompt)
-copilot-byok-model-switcher use azure-gpt -p "fix the failing tests"
-copilot-byok-model-switcher use azure-gpt -p "refactor this function" --allow-tool=write
+gh-copilot-byok use azure-gpt -p "fix the failing tests"
+gh-copilot-byok use azure-gpt -p "refactor this function" --allow-tool=write
 
 # Deny a specific tool
-copilot-byok-model-switcher use azure-gpt -p "explain this code" --deny-tool=run_command
+gh-copilot-byok use azure-gpt -p "explain this code" --deny-tool=run_command
 
 # Disable a named MCP server
-copilot-byok-model-switcher use azure-gpt -p "fix the tests" --disable-mcp-server=foundry-mcp
+gh-copilot-byok use azure-gpt -p "fix the tests" --disable-mcp-server=foundry-mcp
 ```
 
 **Common passthrough flags:**
@@ -113,51 +113,51 @@ copilot-byok-model-switcher use azure-gpt -p "fix the tests" --disable-mcp-serve
 ### Use the last used profile
 
 ```bash
-copilot-byok-model-switcher last [copilot-args..]
+gh-copilot-byok last [copilot-args..]
 ```
 
 Quick access to your most recently used profile. Accepts the same passthrough flags as `use`.
 
 ```bash
 # Interactive mode
-copilot-byok-model-switcher last
+gh-copilot-byok last
 
 # Non-interactive prompt
-copilot-byok-model-switcher last -p "explain this code"
-copilot-byok-model-switcher last -p "how to list files"
+gh-copilot-byok last -p "explain this code"
+gh-copilot-byok last -p "how to list files"
 ```
 
 ### Use default Copilot
 
 ```bash
-copilot-byok-model-switcher default [copilot-args..]
+gh-copilot-byok default [copilot-args..]
 ```
 
 Switch back to the default GitHub Copilot (no BYOK). Accepts the same passthrough flags as `use`.
 
 ```bash
 # Interactive mode
-copilot-byok-model-switcher default
+gh-copilot-byok default
 
 # Non-interactive prompt
-copilot-byok-model-switcher default -p "explain this code"
-copilot-byok-model-switcher default -p "how do I list files?"
+gh-copilot-byok default -p "explain this code"
+gh-copilot-byok default -p "how do I list files?"
 ```
 
 ### Add a new profile
 
 ```bash
-copilot-byok-model-switcher add
+gh-copilot-byok add
 ```
 
 Interactive wizard to add or update a profile.
 
-If a profile with equivalent settings already exists (same provider/model/base URL/auth/token/MCP settings), copilot-byok-model-switcher updates the existing profile instead of creating a duplicate.
+If a profile with equivalent settings already exists (same provider/model/base URL/auth/token/MCP settings), gh-copilot-byok updates the existing profile instead of creating a duplicate.
 
 ### Remove profiles (multi-select)
 
 ```bash
-copilot-byok-model-switcher remove [profile1 profile2 ...]
+gh-copilot-byok remove [profile1 profile2 ...]
 ```
 
 - Run without names for interactive multi-select removal.
@@ -166,19 +166,19 @@ copilot-byok-model-switcher remove [profile1 profile2 ...]
 
 ```bash
 # Interactive multi-select
-copilot-byok-model-switcher remove
+gh-copilot-byok remove
 
 # Remove two by name
-copilot-byok-model-switcher remove azure-gpt ollama-local
+gh-copilot-byok remove azure-gpt ollama-local
 ```
 
 ### Import profiles from Foundry deployments
 
 ```bash
-copilot-byok-model-switcher import-foundry [options]
+gh-copilot-byok import-foundry [options]
 ```
 
-Discovers Azure OpenAI / Foundry accounts and deployments via Azure CLI and creates copilot-byok-model-switcher profiles.
+Discovers Azure OpenAI / Foundry accounts and deployments via Azure CLI and creates gh-copilot-byok profiles.
 
 Only chat-capable deployments are imported (embeddings are skipped).
 On re-import, equivalent profiles are deduplicated automatically.
@@ -197,19 +197,19 @@ On re-import, equivalent profiles are deduplicated automatically.
 
 ```bash
 # Discover all accounts and prompt per deployment (interactive)
-copilot-byok-model-switcher import-foundry
+gh-copilot-byok import-foundry
 
 # Explicit mode each
-copilot-byok-model-switcher import-foundry --mode each
+gh-copilot-byok import-foundry --mode each
 
 # Add all deployments without prompt
-copilot-byok-model-switcher import-foundry --all
+gh-copilot-byok import-foundry --all
 
 # Target one account/resource group
-copilot-byok-model-switcher import-foundry --account myfoundry --resource-group my-rg --all
+gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all
 
 # Scope to a specific subscription
-copilot-byok-model-switcher import-foundry --subscription 00000000-0000-0000-0000-000000000000 --all
+gh-copilot-byok import-foundry --subscription 00000000-0000-0000-0000-000000000000 --all
 ```
 
 ## Configuration
@@ -224,7 +224,7 @@ Config scope behavior:
 In Azure user-scoped mode, file name format is:
 - `~/.copilot-byok-model-switcher/config.<tenantId>__<userName>.json`
 
-Use `copilot-byok-model-switcher list` to see which config file is currently active.
+Use `gh-copilot-byok list` to see which config file is currently active.
 
 ### Example Configuration
 
@@ -314,7 +314,7 @@ export COPILOT_MODEL=<model>
 gh copilot
 ```
 
-If `azureCliToken` is enabled (or `auto` detects Azure profile with no API key), copilot-byok-model-switcher runs:
+If `azureCliToken` is enabled (or `auto` detects Azure profile with no API key), gh-copilot-byok runs:
 
 ```bash
 az account get-access-token --scope https://cognitiveservices.azure.com/.default --query accessToken -o tsv
@@ -322,7 +322,7 @@ az account get-access-token --scope https://cognitiveservices.azure.com/.default
 
 Then it sets the returned token as `COPILOT_PROVIDER_BEARER_TOKEN`. In token mode, `COPILOT_PROVIDER_API_KEY` is cleared to avoid auth-mode ambiguity.
 
-For Azure BYOK profiles, copilot-byok-model-switcher also enables an MCP compatibility mode by default to avoid provider tool-count limits (for example: `Invalid 'tools': array too long`).
+For Azure BYOK profiles, gh-copilot-byok also enables an MCP compatibility mode by default to avoid provider tool-count limits (for example: `Invalid 'tools': array too long`).
 
 **Selecting which MCP servers to disable:** The first time you launch an Azure BYOK profile interactively (no `-p`), you are prompted to choose which MCP servers to disable from the known-heavy list. Your selection is saved to the profile under `mcpCompatServers` and reused on every subsequent run — no re-prompting needed.
 
@@ -332,7 +332,7 @@ To change the selection later, edit `mcpCompatServers` in your config file, or r
 
 **Non-interactive mode & tool permissions:**
 
-When you pass `-p`/`--prompt` (non-interactive mode), `gh copilot` cannot prompt for per-tool permission at runtime and will fail with `could not request permission from user`. copilot-byok-model-switcher automatically adds `--allow-all-tools` for you so scripts and piped usage work without extra flags.
+When you pass `-p`/`--prompt` (non-interactive mode), `gh copilot` cannot prompt for per-tool permission at runtime and will fail with `could not request permission from user`. gh-copilot-byok automatically adds `--allow-all-tools` for you so scripts and piped usage work without extra flags.
 
 If you already specify any of the permission flags below, auto-injection is skipped:
 
@@ -347,17 +347,17 @@ Examples:
 
 ```bash
 # Auto-injection: --allow-all-tools is added for you
-copilot-byok-model-switcher use myprofile -p "fix the tests"
+gh-copilot-byok use myprofile -p "fix the tests"
 
 # Explicit override: only allow the write tool
-copilot-byok-model-switcher use myprofile -p "fix the tests" --allow-tool=write
+gh-copilot-byok use myprofile -p "fix the tests" --allow-tool=write
 
 # Restrict further with --deny-tool even when --allow-all-tools is injected
-copilot-byok-model-switcher use myprofile -p "fix the tests" --deny-tool=run_command
+gh-copilot-byok use myprofile -p "fix the tests" --deny-tool=run_command
 ```
 
 Retry behavior:
-- If `gh copilot` fails with token/auth-related errors, copilot-byok-model-switcher refreshes the token and retries once.
+- If `gh copilot` fails with token/auth-related errors, gh-copilot-byok refreshes the token and retries once.
 
 ## Enterprise Scenarios
 
@@ -435,38 +435,38 @@ Imported profiles are created as:
 
 ```bash
 # Add Azure OpenAI profile
-copilot-byok-model-switcher add
+gh-copilot-byok add
 # Follow prompts...
 
 # List all profiles
-copilot-byok-model-switcher list
+gh-copilot-byok list
 
 # Use Azure profile interactively
-copilot-byok-model-switcher use azure-gpt
+gh-copilot-byok use azure-gpt
 
 # Use Azure profile with a prompt (non-interactive)
-copilot-byok-model-switcher use azure-gpt -p "create a function to sort an array"
+gh-copilot-byok use azure-gpt -p "create a function to sort an array"
 
 # Use Azure profile with prompt mode
-copilot-byok-model-switcher use azure-gpt -p "create a function to sort an array"
+gh-copilot-byok use azure-gpt -p "create a function to sort an array"
 
 # Switch back to default
-copilot-byok-model-switcher default -p "explain this code"
+gh-copilot-byok default -p "explain this code"
 
 # Use last profile
-copilot-byok-model-switcher last
+gh-copilot-byok last
 
 # Use last profile non-interactively
-copilot-byok-model-switcher last -p "fix the failing test"
+gh-copilot-byok last -p "fix the failing test"
 
 # Import all Foundry deployments
-copilot-byok-model-switcher import-foundry --all
+gh-copilot-byok import-foundry --all
 ```
 
 ## Troubleshooting
 
 ### "Profile not found"
-Run `copilot-byok-model-switcher list` to see available profiles or `copilot-byok-model-switcher add` to create a new one.
+Run `gh-copilot-byok list` to see available profiles or `gh-copilot-byok add` to create a new one.
 
 ### "Error executing gh copilot"
 Ensure GitHub Copilot CLI is installed:

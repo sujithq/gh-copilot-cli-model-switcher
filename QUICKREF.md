@@ -1,4 +1,4 @@
-﻿# copilot-byok-model-switcher Quick Reference
+# copilot-byok-model-switcher Quick Reference
 
 ## Installation
 
@@ -9,7 +9,7 @@ cd nodejs && npm install && npm link
 
 ### .NET
 ```bash
-cd dotnet/CopilotX && dotnet pack && dotnet tool install --global --add-source ./nupkg copilot-byok-model-switcher
+cd dotnet/CopilotX && dotnet pack && dotnet tool install --global --add-source ./nupkg gh-copilot-byok
 ```
 
 ## Testing
@@ -33,13 +33,13 @@ cd dotnet/CopilotX.Tests && dotnet run
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `copilot-byok-model-switcher list` | Show profiles with interactive selection menu | `copilot-byok-model-switcher list` → Enter profile # |
-| `copilot-byok-model-switcher use <profile>` | Use specific profile | `copilot-byok-model-switcher use azure-gpt4` |
-| `copilot-byok-model-switcher last` | Use last profile | `copilot-byok-model-switcher last` |
-| `copilot-byok-model-switcher default` | Use default Copilot | `copilot-byok-model-switcher default` |
-| `copilot-byok-model-switcher add` | Add new profile | `copilot-byok-model-switcher add` |
-| `copilot-byok-model-switcher import-foundry` | Import from Foundry deployments | `copilot-byok-model-switcher import-foundry --mode each` |
-| `copilot-byok-model-switcher help` | Show help | `copilot-byok-model-switcher help` |
+| `gh-copilot-byok list` | Show profiles with interactive selection menu | `gh-copilot-byok list` → Enter profile # |
+| `gh-copilot-byok use <profile>` | Use specific profile | `gh-copilot-byok use azure-gpt4` |
+| `gh-copilot-byok last` | Use last profile | `gh-copilot-byok last` |
+| `gh-copilot-byok default` | Use default Copilot | `gh-copilot-byok default` |
+| `gh-copilot-byok add` | Add new profile | `gh-copilot-byok add` |
+| `gh-copilot-byok import-foundry` | Import from Foundry deployments | `gh-copilot-byok import-foundry --mode each` |
+| `gh-copilot-byok help` | Show help | `gh-copilot-byok help` |
 
 ## Profile Types
 
@@ -121,7 +121,7 @@ export OPENAI_API_KEY="sk-..."
 export APIM_KEY="your-key"
 ```
 
-For keyless Azure profiles, copilot-byok-model-switcher uses Azure CLI:
+For keyless Azure profiles, gh-copilot-byok uses Azure CLI:
 ```bash
 az login
 az account get-access-token --scope https://cognitiveservices.azure.com/.default
@@ -135,43 +135,43 @@ Auth toggle fields:
 
 ### Switch Models
 ```bash
-copilot-byok-model-switcher use azure-gpt4
-copilot-byok-model-switcher use openai
-copilot-byok-model-switcher use ollama
+gh-copilot-byok use azure-gpt4
+gh-copilot-byok use openai
+gh-copilot-byok use ollama
 ```
 
 ### With Commands
 ```bash
-copilot-byok-model-switcher use azure-gpt4 -p "create a function"
-copilot-byok-model-switcher use ollama -p "what does this do"
-copilot-byok-model-switcher last -p "another question"
+gh-copilot-byok use azure-gpt4 -p "create a function"
+gh-copilot-byok use ollama -p "what does this do"
+gh-copilot-byok last -p "another question"
 ```
 
 ### Quick Access
 ```bash
 # Set preferred profile
-copilot-byok-model-switcher use azure-gpt4
+gh-copilot-byok use azure-gpt4
 
 # Use it repeatedly
-copilot-byok-model-switcher last -p "..."
-copilot-byok-model-switcher last -p "..."
+gh-copilot-byok last -p "..."
+gh-copilot-byok last -p "..."
 ```
 
 ### Import Foundry Deployments
 ```bash
 # Prompt for each discovered deployment
-copilot-byok-model-switcher import-foundry --mode each
+gh-copilot-byok import-foundry --mode each
 
 # Add all discovered deployments
-copilot-byok-model-switcher import-foundry --all
+gh-copilot-byok import-foundry --all
 
 # Import from one account/resource group
-copilot-byok-model-switcher import-foundry --account myfoundry --resource-group my-rg --all
+gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all
 ```
 
 ## Files
 
-- **Config (active)**: shown by `copilot-byok-model-switcher list`
+- **Config (active)**: shown by `gh-copilot-byok list`
 - **Global config**: `~/.copilot-byok-model-switcher/config.json`
 - **Azure user-scoped config**: `~/.copilot-byok-model-switcher/config.<tenantId>__<userName>.json`
 - **Scope override**: `COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE=auto|azure-user|global`
@@ -183,7 +183,7 @@ copilot-byok-model-switcher import-foundry --account myfoundry --resource-group 
 
 ### Profile not found
 ```bash
-copilot-byok-model-switcher list  # Check available profiles
+gh-copilot-byok list  # Check available profiles
 ```
 
 ### API key missing

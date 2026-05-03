@@ -1,4 +1,4 @@
-﻿# copilot-byok-model-switcher Configuration Examples
+# copilot-byok-model-switcher Configuration Examples
 
 This directory contains sample configuration files and usage examples for copilot-byok-model-switcher.
 
@@ -20,7 +20,7 @@ See [`config.sample.json`](config.sample.json) for a complete example configurat
 
 **Usage**:
 ```bash
-copilot-byok-model-switcher use default
+gh-copilot-byok use default
 ```
 
 ### Azure OpenAI with API Key
@@ -42,7 +42,7 @@ export AZURE_OPENAI_KEY="your-api-key-here"
 
 **Usage**:
 ```bash
-copilot-byok-model-switcher use azure-gpt4 -p "create a function to parse JSON"
+gh-copilot-byok use azure-gpt4 -p "create a function to parse JSON"
 ```
 
 ### Azure OpenAI with RBAC (API Keys Disabled, Local Wrapper)
@@ -66,12 +66,12 @@ az login
 
 **Usage**:
 ```bash
-copilot-byok-model-switcher use azure-rbac-local -p "create a function to parse JSON"
+gh-copilot-byok use azure-rbac-local -p "create a function to parse JSON"
 ```
 
 Notes:
 - `azureCliToken: auto` detects Azure profiles and uses Azure CLI token when API key is not configured.
-- On token/auth failures, copilot-byok-model-switcher refreshes token and retries once.
+- On token/auth failures, gh-copilot-byok refreshes token and retries once.
 
 ### OpenAI API
 
@@ -92,7 +92,7 @@ export OPENAI_API_KEY="sk-..."
 
 **Usage**:
 ```bash
-copilot-byok-model-switcher use openai-gpt4 -p "what does this code do"
+gh-copilot-byok use openai-gpt4 -p "what does this code do"
 ```
 
 ### Ollama Local
@@ -120,7 +120,7 @@ ollama serve
 
 **Usage**:
 ```bash
-copilot-byok-model-switcher use ollama-llama3 -p "write a hello world script"
+gh-copilot-byok use ollama-llama3 -p "write a hello world script"
 ```
 
 ### Azure OpenAI via APIM Proxy
@@ -145,7 +145,7 @@ export APIM_SUBSCRIPTION_KEY="your-subscription-key"
 
 **Usage**:
 ```bash
-copilot-byok-model-switcher use azure-proxy -p "help me debug this"
+gh-copilot-byok use azure-proxy -p "help me debug this"
 ```
 
 ## Usage Scenarios
@@ -157,28 +157,28 @@ copilot-byok-model-switcher use azure-proxy -p "help me debug this"
 export OPENAI_API_KEY="sk-..."
 
 # Add profile
-copilot-byok-model-switcher add
+gh-copilot-byok add
 # Enter: openai-dev, byok, https://api.openai.com/v1, gpt-4, env, OPENAI_API_KEY
 
 # Use for coding
-copilot-byok-model-switcher use openai-dev -p "create a REST API endpoint"
-copilot-byok-model-switcher use openai-dev -p "how does this function work"
+gh-copilot-byok use openai-dev -p "create a REST API endpoint"
+gh-copilot-byok use openai-dev -p "how does this function work"
 ```
 
 ### Scenario 2: Enterprise Azure with Multiple Deployments
 
 ```bash
 # Add production profile
-copilot-byok-model-switcher add
+gh-copilot-byok add
 # Enter: azure-prod, byok, https://prod.openai.azure.com/..., gpt-4, env, AZURE_PROD_KEY
 
 # Add development profile
-copilot-byok-model-switcher add
+gh-copilot-byok add
 # Enter: azure-dev, byok, https://dev.openai.azure.com/..., gpt-4, env, AZURE_DEV_KEY
 
 # Use different profiles for different tasks
-copilot-byok-model-switcher use azure-dev -p "test function"
-copilot-byok-model-switcher use azure-prod -p "production code"
+gh-copilot-byok use azure-dev -p "test function"
+gh-copilot-byok use azure-prod -p "production code"
 ```
 
 ### Scenario 3: Offline Development with Ollama
@@ -189,40 +189,40 @@ ollama pull llama3
 ollama serve
 
 # Add Ollama profile
-copilot-byok-model-switcher add
+gh-copilot-byok add
 # Enter: local, byok, http://localhost:11434/v1, llama3, none
 
 # Work offline
-copilot-byok-model-switcher use local -p "create a function"
-copilot-byok-model-switcher use local -p "what is this"
+gh-copilot-byok use local -p "create a function"
+gh-copilot-byok use local -p "what is this"
 ```
 
 ### Scenario 4: Switching Between Models
 
 ```bash
 # List all profiles
-copilot-byok-model-switcher list
+gh-copilot-byok list
 
 # Try different models for comparison
-copilot-byok-model-switcher use gpt-4 -p "optimize this code"
-copilot-byok-model-switcher use gpt-3.5 -p "optimize this code"
-copilot-byok-model-switcher use llama3 -p "optimize this code"
+gh-copilot-byok use gpt-4 -p "optimize this code"
+gh-copilot-byok use gpt-3.5 -p "optimize this code"
+gh-copilot-byok use llama3 -p "optimize this code"
 
 # Use last profile quickly
-copilot-byok-model-switcher last -p "another question"
+gh-copilot-byok last -p "another question"
 ```
 
 ### Scenario 5: Testing with Different Providers
 
 ```bash
 # Test with OpenAI
-copilot-byok-model-switcher use openai-gpt4 -p "write unit tests for this function"
+gh-copilot-byok use openai-gpt4 -p "write unit tests for this function"
 
 # Test with Azure
-copilot-byok-model-switcher use azure-gpt4 -p "write unit tests for this function"
+gh-copilot-byok use azure-gpt4 -p "write unit tests for this function"
 
 # Test locally
-copilot-byok-model-switcher use ollama-llama3 -p "write unit tests for this function"
+gh-copilot-byok use ollama-llama3 -p "write unit tests for this function"
 
 # Compare results and choose preferred provider
 ```
@@ -329,21 +329,21 @@ Not this:
 
 ```bash
 # Set up your preferred profile
-copilot-byok-model-switcher use azure-gpt4
+gh-copilot-byok use azure-gpt4
 
 # From now on, just use:
-copilot-byok-model-switcher last -p "..."
-copilot-byok-model-switcher last -p "..."
+gh-copilot-byok last -p "..."
+gh-copilot-byok last -p "..."
 ```
 
 ### 5. Test Locally First
 
 ```bash
 # Test with Ollama before using paid APIs
-copilot-byok-model-switcher use ollama-local -p "is this approach correct?"
+gh-copilot-byok use ollama-local -p "is this approach correct?"
 
 # Once confirmed, switch to production
-copilot-byok-model-switcher use azure-prod -p "implement the final version"
+gh-copilot-byok use azure-prod -p "implement the final version"
 ```
 
 ## Troubleshooting Examples
@@ -366,10 +366,10 @@ source ~/.bashrc
 
 ```bash
 # List current configuration
-copilot-byok-model-switcher list
+gh-copilot-byok list
 
 # Update profile
-copilot-byok-model-switcher add
+gh-copilot-byok add
 # Use same name to update existing profile
 ```
 
@@ -412,9 +412,9 @@ cp ~/.copilot-byok-model-switcher/config.json ./my-project/.copilot-byok-model-s
 
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
-alias cx='copilot-byok-model-switcher'
-alias cxl='copilot-byok-model-switcher last'
-alias cxs='copilot-byok-model-switcher use'
+alias cx='gh-copilot-byok'
+alias cxl='gh-copilot-byok last'
+alias cxs='gh-copilot-byok use'
 
 # Usage
 cx list
@@ -428,25 +428,25 @@ cxs azure-prod -p "this code"
 
 ```bash
 # Morning: Start with default Copilot
-copilot-byok-model-switcher default
+gh-copilot-byok default
 
 # Need Azure features: Switch to Azure
-copilot-byok-model-switcher use azure-gpt4
+gh-copilot-byok use azure-gpt4
 
 # Working offline: Switch to Ollama
-copilot-byok-model-switcher use ollama-local
+gh-copilot-byok use ollama-local
 
 # Quick subsequent uses
-copilot-byok-model-switcher last
+gh-copilot-byok last
 ```
 
 ### Workflow 2: Code Review
 
 ```bash
 # Review with multiple models
-copilot-byok-model-switcher use gpt-4 -p "review this code"
-copilot-byok-model-switcher use azure-gpt4 -p "review this code"
-copilot-byok-model-switcher use claude -p "review this code"
+gh-copilot-byok use gpt-4 -p "review this code"
+gh-copilot-byok use azure-gpt4 -p "review this code"
+gh-copilot-byok use claude -p "review this code"
 
 # Compare insights from different models
 ```
@@ -457,7 +457,7 @@ copilot-byok-model-switcher use claude -p "review this code"
 # Test prompt with each model
 for profile in gpt-4 gpt-3.5 llama3; do
   echo "Testing with $profile"
-  copilot-byok-model-switcher use $profile -p "optimize this algorithm"
+  gh-copilot-byok use $profile -p "optimize this algorithm"
 done
 ```
 
@@ -468,7 +468,7 @@ done
 ```bash
 # .git/hooks/pre-commit
 #!/bin/bash
-copilot-byok-model-switcher use azure-dev -p "check code quality of staged files"
+gh-copilot-byok use azure-dev -p "check code quality of staged files"
 ```
 
 ### With CI/CD
@@ -478,7 +478,7 @@ copilot-byok-model-switcher use azure-dev -p "check code quality of staged files
 - name: AI Code Review
   run: |
     export AZURE_OPENAI_KEY="${{ secrets.AZURE_OPENAI_KEY }}"
-    copilot-byok-model-switcher use azure-gpt4 -p "review changes"
+    gh-copilot-byok use azure-gpt4 -p "review changes"
 ```
 
 ### With VS Code Tasks
@@ -490,7 +490,7 @@ copilot-byok-model-switcher use azure-dev -p "check code quality of staged files
     {
       "label": "Copilot Prompt",
       "type": "shell",
-      "command": "copilot-byok-model-switcher last -p '${selectedText}'"
+      "command": "gh-copilot-byok last -p '${selectedText}'"
     }
   ]
 }

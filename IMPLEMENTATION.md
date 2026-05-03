@@ -1,4 +1,4 @@
-﻿# copilot-byok-model-switcher - Implementation Summary
+# copilot-byok-model-switcher - Implementation Summary
 
 ## ✅ Completed Implementation
 
@@ -76,9 +76,9 @@ This repository now contains a complete implementation of the copilot-byok-model
 ### Core Requirements ✅
 
 1. **Easy switching between models** ✅
-   - `copilot-byok-model-switcher use <profile>` command
-   - Quick access with `copilot-byok-model-switcher last`
-   - Switch to default with `copilot-byok-model-switcher default`
+   - `gh-copilot-byok use <profile>` command
+   - Quick access with `gh-copilot-byok last`
+   - Switch to default with `gh-copilot-byok default`
 
 2. **Persist configurations locally** ✅
    - Config stored in `~/.copilot-byok-model-switcher/config.json`
@@ -87,7 +87,7 @@ This repository now contains a complete implementation of the copilot-byok-model
 
 3. **Reuse previous configurations** ✅
    - `lastUsed` tracking
-   - `copilot-byok-model-switcher last` command
+   - `gh-copilot-byok last` command
    - Profile history maintained
 
 4. **Support enterprise scenarios** ✅
@@ -137,7 +137,7 @@ All required environment variables are set:
 ### Component Structure
 
 ```
-copilot-byok-model-switcher
+gh-copilot-byok
 ├── nodejs/                 # Node.js implementation
 │   ├── index.js           # Main CLI app
 │   ├── config.js          # Config manager
@@ -202,7 +202,7 @@ npm link
 ```bash
 cd dotnet/CopilotX
 dotnet pack
-dotnet tool install --global --add-source ./nupkg copilot-byok-model-switcher
+dotnet tool install --global --add-source ./nupkg gh-copilot-byok
 ```
 
 ## 🧪 Testing Performed
@@ -246,19 +246,19 @@ Both implementations are:
 
 ```bash
 # List profiles
-copilot-byok-model-switcher list
+gh-copilot-byok list
 
 # Add new profile
-copilot-byok-model-switcher add
+gh-copilot-byok add
 
 # Use specific profile
-copilot-byok-model-switcher use azure-gpt4 -p "create a function"
+gh-copilot-byok use azure-gpt4 -p "create a function"
 
 # Use last profile
-copilot-byok-model-switcher last -p "this code"
+gh-copilot-byok last -p "this code"
 
 # Switch to default
-copilot-byok-model-switcher default
+gh-copilot-byok default
 ```
 
 ## 🎨 Highlights
