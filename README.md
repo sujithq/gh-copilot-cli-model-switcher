@@ -158,12 +158,15 @@ Release Please determines version bumps from commit messages:
 - `fix:` -> patch bump (x.y.Z)
 - `feat:` -> minor bump (x.Y.0)
 - `feat!:` or `BREAKING CHANGE:` -> major bump (X.0.0)
+- `docs:` -> no release by default
 
 Examples:
 
 - `fix(node): handle null mcp list`
 - `feat(dotnet): add mcp-compat command`
 - `feat!: drop legacy config format`
+
+If a GitHub Release tag already exists and publish needs to be rerun manually, use the `Release Please` workflow's optional `release_tag` input.
 
 ## 🧱 Core Concepts
 

@@ -23,6 +23,10 @@ This project publishes the .NET global tool package `gh-copilot-byok` to both Nu
   - Push package to GitHub Packages NuGet feed
   - Upload `.nupkg` to that published GitHub Release
 
+Notes:
+- `docs:` commits do not create a release by default, so they do not trigger publish through Release Please.
+- If a release tag already exists and you need to rerun publishing manually, run the `Release Please` workflow with the optional `release_tag` input set to that existing tag.
+
 ## Install after release
 
 ### From NuGet.org (recommended — no authentication required)
