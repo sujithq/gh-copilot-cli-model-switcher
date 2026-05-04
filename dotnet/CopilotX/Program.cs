@@ -146,6 +146,7 @@ class Program
         table.AddColumn("Type");
         table.AddColumn("Base URL");
         table.AddColumn("Model");
+        table.AddColumn("Token Limits");
 
         var profileList = profiles.ToList();
         for (int i = 0; i < profileList.Count; i++)
@@ -154,6 +155,7 @@ class Program
             var marker = profile.Name == lastUsed ? "[green]*[/]" : " ";
             var baseUrl = profile.BaseUrl ?? "N/A";
             var model = profile.Model ?? "N/A";
+            var tokenInfo = FormatProfileTokenInfo(profile);
 
             table.AddRow(
                 $"[dim]{i + 1}[/]",
@@ -161,7 +163,8 @@ class Program
                 $"[cyan]{profile.Name}[/]",
                 profile.Type,
                 baseUrl,
-                model
+                model,
+                tokenInfo
             );
         }
 
@@ -190,12 +193,14 @@ class Program
         table.AddColumn("");
         table.AddColumn("Name");
         table.AddColumn("Type");
+        table.AddColumn("Token Limits");
 
         for (int i = 0; i < profileList.Count; i++)
         {
             var profile = profileList[i];
             var marker = profile.Name == lastUsed ? "[green]*[/]" : " ";
-            table.AddRow($"[dim]{i + 1}[/]", marker, $"[cyan]{profile.Name}[/]", profile.Type);
+            var tokenInfo = FormatProfileTokenInfo(profile);
+            table.AddRow($"[dim]{i + 1}[/]", marker, $"[cyan]{profile.Name}[/]", profile.Type, tokenInfo);
         }
 
         AnsiConsole.Write(table);
@@ -502,6 +507,7 @@ class Program
         }
 
         AnsiConsole.MarkupLine($"[green]Using profile:[/] {Markup.Escape(profile.Name)} ([dim]{Markup.Escape(profile.Type)}[/])");
+        AnsiConsole.MarkupLine($"[dim]Token limits: {EscapeMarkup(FormatProfileTokenInfo(profile))}[/]");
 
         AuthEnvironmentResult envInfo;
         try
@@ -914,6 +920,16 @@ class Program
     static string FormatOptionalInt(int? value)
     {
         return value.HasValue ? value.Value.ToString() : "not set";
+    }
+
+    internal static string FormatProfileTokenInfo(Profile profile)
+    {
+        if (!profile.MaxOutputTokens.HasValue && !profile.MaxPromptTokens.HasValue)
+        {
+            return "not set";
+        }
+
+        return $"output={FormatOptionalInt(profile.MaxOutputTokens)}, prompt={FormatOptionalInt(profile.MaxPromptTokens)}";
     }
 
     static int? ParseOptionalPositiveIntOption(string? rawValue, string optionName)
