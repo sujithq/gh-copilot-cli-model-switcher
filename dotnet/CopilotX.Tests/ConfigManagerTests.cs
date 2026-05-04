@@ -286,4 +286,24 @@ public class ConfigManagerTests : IDisposable
         }
     }
 
+    [Fact]
+    public void FormatProfileTokenInfo_ReturnsNotSet_WhenNoLimitsConfigured()
+    {
+        var text = CopilotX.Program.FormatProfileTokenInfo(new Profile());
+
+        Assert.Equal("not set", text);
+    }
+
+    [Fact]
+    public void FormatProfileTokenInfo_ReturnsBothTokenValues_WhenConfigured()
+    {
+        var text = CopilotX.Program.FormatProfileTokenInfo(new Profile
+        {
+            MaxOutputTokens = 4096,
+            MaxPromptTokens = 64000
+        });
+
+        Assert.Equal("output=4096, prompt=64000", text);
+    }
+
 }
