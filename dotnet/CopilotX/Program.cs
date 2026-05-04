@@ -1458,6 +1458,9 @@ class Program
         options.TryGetValue("max-output-tokens", out var maxOutputTokensRaw);
         options.TryGetValue("max-prompt-tokens", out var maxPromptTokensRaw);
 
+        var hasExplicitMaxOutputTokens = options.ContainsKey("max-output-tokens");
+        var hasExplicitMaxPromptTokens = options.ContainsKey("max-prompt-tokens");
+
         var maxOutputTokens = ParseOptionalPositiveIntOption(maxOutputTokensRaw, "max-output-tokens");
         var maxPromptTokens = ParseOptionalPositiveIntOption(maxPromptTokensRaw, "max-prompt-tokens");
 
@@ -1479,8 +1482,8 @@ class Program
 
         if (shouldPromptForTokenLimits)
         {
-            maxOutputTokens = AskOptionalInt("Default max [cyan]output tokens[/] for imported profiles (optional):");
-            maxPromptTokens = AskOptionalInt("Default max [cyan]prompt tokens[/] for imported profiles (optional):");
+            maxOutputTokens = AskOptionalInt("Default fallback max [cyan]output tokens[/] when deployment metadata has no suggestion (optional):");
+            maxPromptTokens = AskOptionalInt("Default fallback max [cyan]prompt tokens[/] when deployment metadata has no suggestion (optional):");
         }
 
         try
@@ -1517,8 +1520,16 @@ class Program
                 .GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-            var outputLabel = maxOutputTokens.HasValue ? maxOutputTokens.Value.ToString() : "not set";
-            var promptLabel = maxPromptTokens.HasValue ? maxPromptTokens.Value.ToString() : "not set";
+            var outputLabel = hasExplicitMaxOutputTokens
+                ? $"{FormatOptionalInt(maxOutputTokens)} (explicit override)"
+                : (maxOutputTokens.HasValue
+                    ? $"metadata first, fallback={maxOutputTokens.Value}"
+                    : "metadata first, fallback=not set");
+            var promptLabel = hasExplicitMaxPromptTokens
+                ? $"{FormatOptionalInt(maxPromptTokens)} (explicit override)"
+                : (maxPromptTokens.HasValue
+                    ? $"metadata first, fallback={maxPromptTokens.Value}"
+                    : "metadata first, fallback=not set");
             AnsiConsole.MarkupLine($"[dim]Import token limits: output={EscapeMarkup(outputLabel)}, prompt={EscapeMarkup(promptLabel)}[/]");
 
             foreach (var foundryAccount in accounts)
@@ -1567,8 +1578,31 @@ class Program
                         continue;
                     }
 
-                    var profileMaxOutputTokens = maxOutputTokens;
-                    var profileMaxPromptTokens = maxPromptTokens;
+                    var proposedOutputTokens = hasExplicitMaxOutputTokens
+                        ? maxOutputTokens
+                        : (deployment.SuggestedMaxOutputTokens ?? maxOutputTokens);
+                    var proposedPromptTokens = hasExplicitMaxPromptTokens
+                        ? maxPromptTokens
+                        : (deployment.SuggestedMaxPromptTokens ?? maxPromptTokens);
+
+                    var outputSource = hasExplicitMaxOutputTokens
+                        ? "explicit"
+                        : (deployment.SuggestedMaxOutputTokens.HasValue
+                            ? deployment.SuggestedMaxOutputTokensSource
+                            : (maxOutputTokens.HasValue ? "fallback" : "not-set"));
+                    var promptSource = hasExplicitMaxPromptTokens
+                        ? "explicit"
+                        : (deployment.SuggestedMaxPromptTokens.HasValue
+                            ? deployment.SuggestedMaxPromptTokensSource
+                            : (maxPromptTokens.HasValue ? "fallback" : "not-set"));
+
+                    AnsiConsole.MarkupLine(
+                        $"  [dim]Suggested token limits: output={FormatOptionalInt(proposedOutputTokens)} ({EscapeMarkup(outputSource)}), prompt={FormatOptionalInt(proposedPromptTokens)} ({EscapeMarkup(promptSource)})[/]");
+                    AnsiConsole.MarkupLine(
+                        $"  [dim]Rate limits: tpm={FormatOptionalInt(deployment.SuggestedTpm)}, rpm={FormatOptionalInt(deployment.SuggestedRpm)}[/]");
+
+                    var profileMaxOutputTokens = proposedOutputTokens;
+                    var profileMaxPromptTokens = proposedPromptTokens;
 
                     if (effectiveMode == "each")
                     {
@@ -1580,10 +1614,10 @@ class Program
                         {
                             profileMaxOutputTokens = AskOptionalIntWithDefault(
                                 "Max [cyan]output tokens[/]",
-                                maxOutputTokens);
+                                proposedOutputTokens);
                             profileMaxPromptTokens = AskOptionalIntWithDefault(
                                 "Max [cyan]prompt tokens[/]",
-                                maxPromptTokens);
+                                proposedPromptTokens);
                         }
                     }
 
