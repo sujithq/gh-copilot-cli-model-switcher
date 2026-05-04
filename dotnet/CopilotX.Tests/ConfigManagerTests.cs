@@ -134,6 +134,14 @@ public class ConfigManagerTests : IDisposable
     }
 
     [Fact]
+    public void BuildBaseProfileName_ReturnsDeterministicCanonicalName()
+    {
+        var result = FoundryImportHelpers.BuildBaseProfileName("My Foundry", "GPT-5.4-1");
+
+        Assert.Equal("foundry-my-foundry-gpt-5-4-1", result);
+    }
+
+    [Fact]
     public void BuildImportedProfile_CreatesAzureTokenProfile()
     {
         var profile = FoundryImportHelpers.BuildImportedProfile(
