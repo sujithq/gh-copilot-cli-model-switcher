@@ -112,6 +112,95 @@ public class ConfigManagerTests : IDisposable
         Assert.Equal(string.Empty, deployment.ModelVersion);
     }
 
+        [Fact]
+        public void MapDeployment_ReadsSuggestedTokenLimits_FromMetadata()
+        {
+                using var doc = JsonDocument.Parse("""
+                {
+                    "name": "gpt-5-prod",
+                    "properties": {
+                        "model": {
+                            "name": "gpt-5",
+                            "version": "2026-03-01",
+                            "maxOutputTokens": 8192
+                        },
+                        "capabilities": {
+                            "maxInputTokens": "128000"
+                        }
+                    }
+                }
+                """);
+
+                var deployment = FoundryImportHelpers.MapDeployment(doc.RootElement);
+
+                Assert.Equal(8192, deployment.SuggestedMaxOutputTokens);
+                Assert.Equal(128000, deployment.SuggestedMaxPromptTokens);
+                Assert.Equal("metadata", deployment.SuggestedMaxOutputTokensSource);
+                Assert.Equal("metadata", deployment.SuggestedMaxPromptTokensSource);
+        }
+
+            [Fact]
+            public void MapDeployment_UsesModelFamilyHeuristics_WhenMetadataTokenLimitsMissing()
+            {
+                using var doc = JsonDocument.Parse("""
+                {
+                    "name": "gpt-4.1-prod",
+                    "properties": {
+                        "model": {
+                            "name": "gpt-4.1",
+                            "version": "2025-04-14"
+                        }
+                    }
+                }
+                """);
+
+                var deployment = FoundryImportHelpers.MapDeployment(doc.RootElement);
+
+                Assert.Equal(8192, deployment.SuggestedMaxOutputTokens);
+                Assert.Equal(128000, deployment.SuggestedMaxPromptTokens);
+                Assert.Equal("model-family", deployment.SuggestedMaxOutputTokensSource);
+                Assert.Equal("model-family", deployment.SuggestedMaxPromptTokensSource);
+            }
+
+    [Fact]
+    public void MapDeployment_ReadsRateLimits_ForGpt54AndKimi()
+    {
+        using var gptDoc = JsonDocument.Parse("""
+        {
+            "name": "gpt-5.4-1",
+            "properties": {
+                "model": { "name": "gpt-5.4", "version": "2026-03-05" },
+                "rateLimits": [
+                    { "key": "request", "count": 5000, "renewalPeriod": 60 },
+                    { "key": "token", "count": 500000, "renewalPeriod": 60 }
+                ]
+            }
+        }
+        """);
+
+        using var kimiDoc = JsonDocument.Parse("""
+        {
+            "name": "Kimi-K2.6-1",
+            "properties": {
+                "model": { "name": "Kimi-K2.6", "version": "2026-04-20" },
+                "rateLimits": [
+                    { "key": "request", "count": 50, "renewalPeriod": 60 },
+                    { "key": "token", "count": 50000, "renewalPeriod": 60 }
+                ]
+            }
+        }
+        """);
+
+        var gptDeployment = FoundryImportHelpers.MapDeployment(gptDoc.RootElement);
+        var kimiDeployment = FoundryImportHelpers.MapDeployment(kimiDoc.RootElement);
+
+        Assert.Equal(500000, gptDeployment.SuggestedTpm);
+        Assert.Equal(5000, gptDeployment.SuggestedRpm);
+
+        Assert.Equal(50000, kimiDeployment.SuggestedTpm);
+        Assert.Equal(50, kimiDeployment.SuggestedRpm);
+    }
+
     [Fact]
     public void IsApplicableAccount_AcceptsAiServicesWithFlattenedEndpoint()
     {
