@@ -245,7 +245,9 @@ On re-import, equivalent profiles are deduplicated automatically.
 | `--max-output-tokens <n>` | Set `maxOutputTokens` on imported profiles |
 | `--max-prompt-tokens <n>` | Set `maxPromptTokens` on imported profiles |
 
-When `import-foundry` runs in fully interactive mode (no `--mode`/`--all` and no token-limit flags), it asks once for optional default token limits and applies them to all selected imports.
+When `import-foundry` runs in fully interactive mode (no `--mode`/`--all` and no token-limit flags), it asks once for optional default token limits.
+
+In `--mode each` (interactive per deployment), you can override those defaults per deployment before profile creation.
 
 **Examples:**
 
@@ -262,12 +264,14 @@ gh-copilot-byok import-foundry --all
 # Add all deployments with explicit token limits
 gh-copilot-byok import-foundry --all --max-output-tokens 4096 --max-prompt-tokens 64000
 
+# Prompt per deployment and optionally override token limits per model
+gh-copilot-byok import-foundry --mode each --max-output-tokens 4096 --max-prompt-tokens 64000
+
 # Target one account/resource group
 gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all
 
 # Scope to a specific subscription
 gh-copilot-byok import-foundry --subscription 00000000-0000-0000-0000-000000000000 --all
-```
 ```
 
 ## Configuration

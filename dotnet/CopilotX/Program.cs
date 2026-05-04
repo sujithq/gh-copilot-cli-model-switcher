@@ -890,6 +890,32 @@ class Program
         }
     }
 
+    static int? AskOptionalIntWithDefault(string prompt, int? defaultValue)
+    {
+        while (true)
+        {
+            var defaultLabel = defaultValue.HasValue ? defaultValue.Value.ToString() : "not set";
+            var input = AnsiConsole.Ask<string>($"{prompt} [dim](Enter for default: {defaultLabel})[/]:", string.Empty).Trim();
+
+            if (string.IsNullOrEmpty(input))
+            {
+                return defaultValue;
+            }
+
+            if (int.TryParse(input, out var value) && value > 0)
+            {
+                return value;
+            }
+
+            AnsiConsole.MarkupLine("[red]Please enter a positive integer or leave it blank.[/]");
+        }
+    }
+
+    static string FormatOptionalInt(int? value)
+    {
+        return value.HasValue ? value.Value.ToString() : "not set";
+    }
+
     static int? ParseOptionalPositiveIntOption(string? rawValue, string optionName)
     {
         if (string.IsNullOrWhiteSpace(rawValue))
@@ -1469,7 +1495,11 @@ class Program
 
             var imported = 0;
             var scanned = 0;
-            var existingNames = new HashSet<string>(ConfigManager.ListProfiles().Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
+            var existingProfiles = ConfigManager.ListProfiles();
+            var existingNames = new HashSet<string>(existingProfiles.Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
+            var existingProfilesByName = existingProfiles
+                .GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
             var outputLabel = maxOutputTokens.HasValue ? maxOutputTokens.Value.ToString() : "not set";
             var promptLabel = maxPromptTokens.HasValue ? maxPromptTokens.Value.ToString() : "not set";
@@ -1521,13 +1551,47 @@ class Program
                         continue;
                     }
 
+                    var profileMaxOutputTokens = maxOutputTokens;
+                    var profileMaxPromptTokens = maxPromptTokens;
+
+                    if (effectiveMode == "each")
+                    {
+                        var customizePerModel = AnsiConsole.Confirm(
+                            $"Customize token limits for deployment '{deployment.DeploymentName}'?",
+                            false);
+
+                        if (customizePerModel)
+                        {
+                            profileMaxOutputTokens = AskOptionalIntWithDefault(
+                                "Max [cyan]output tokens[/]",
+                                maxOutputTokens);
+                            profileMaxPromptTokens = AskOptionalIntWithDefault(
+                                "Max [cyan]prompt tokens[/]",
+                                maxPromptTokens);
+                        }
+                    }
+
                     var profile = FoundryImportHelpers.BuildImportedProfile(
                         foundryAccount.Name,
                         endpoint,
                         deployment,
                         existingNames,
-                        maxOutputTokens,
-                        maxPromptTokens);
+                        profileMaxOutputTokens,
+                        profileMaxPromptTokens);
+
+                    // Keep import idempotent per account+deployment: if canonical Foundry profile
+                    // already exists for this deployment, update it instead of creating a -2 suffix.
+                    var canonicalName = FoundryImportHelpers.BuildBaseProfileName(foundryAccount.Name, deployment.DeploymentName);
+                    if (existingProfilesByName.TryGetValue(canonicalName, out var existingCanonical))
+                    {
+                        var expectedBaseUrl = $"{endpoint}/openai/deployments/{deployment.DeploymentName}";
+                        var existingBaseUrl = (existingCanonical.BaseUrl ?? string.Empty).TrimEnd('/');
+                        if (string.Equals(existingBaseUrl, expectedBaseUrl, StringComparison.OrdinalIgnoreCase))
+                        {
+                            profile.Name = canonicalName;
+                        }
+                    }
+
                     var profileName = profile.Name;
 
                     var upsert = ConfigManager.UpsertProfile(profile);
@@ -1538,18 +1602,23 @@ class Program
                     }
 
                     existingNames.Add(upsert.Name);
+                    profile.Name = upsert.Name;
+                    existingProfilesByName[upsert.Name] = profile;
                     if (upsert.Action == "added")
                     {
                         imported += 1;
-                        AnsiConsole.MarkupLine($"  [green]Added[/] {EscapeMarkup(upsert.Name)}");
+                        AnsiConsole.MarkupLine(
+                            $"  [green]Added[/] {EscapeMarkup(upsert.Name)} [dim](output={FormatOptionalInt(profileMaxOutputTokens)}, prompt={FormatOptionalInt(profileMaxPromptTokens)})[/]");
                     }
                     else if (upsert.Action == "updated-equivalent")
                     {
-                        AnsiConsole.MarkupLine($"  [yellow]Reused existing equivalent profile[/] {EscapeMarkup(upsert.Name)}");
+                        AnsiConsole.MarkupLine(
+                            $"  [yellow]Reused existing equivalent profile[/] {EscapeMarkup(upsert.Name)} [dim](output={FormatOptionalInt(profileMaxOutputTokens)}, prompt={FormatOptionalInt(profileMaxPromptTokens)})[/]");
                     }
                     else
                     {
-                        AnsiConsole.MarkupLine($"  [green]Updated[/] {EscapeMarkup(upsert.Name)}");
+                        AnsiConsole.MarkupLine(
+                            $"  [green]Updated[/] {EscapeMarkup(upsert.Name)} [dim](output={FormatOptionalInt(profileMaxOutputTokens)}, prompt={FormatOptionalInt(profileMaxPromptTokens)})[/]");
                     }
                 }
             }

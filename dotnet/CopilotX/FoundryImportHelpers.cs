@@ -4,6 +4,11 @@ namespace CopilotX;
 
 internal static class FoundryImportHelpers
 {
+    internal static string BuildBaseProfileName(string accountName, string deploymentName)
+    {
+        return $"foundry-{SanitizeProfilePart(accountName)}-{SanitizeProfilePart(deploymentName)}";
+    }
+
     internal static bool IsApplicableAccount(JsonElement item)
     {
         var kind = item.TryGetProperty("kind", out var kindProp) ? kindProp.GetString() ?? string.Empty : string.Empty;
@@ -104,7 +109,7 @@ internal static class FoundryImportHelpers
 
     internal static string BuildUniqueProfileName(string accountName, string deploymentName, IEnumerable<string> existingNames)
     {
-        var baseName = $"foundry-{SanitizeProfilePart(accountName)}-{SanitizeProfilePart(deploymentName)}";
+        var baseName = BuildBaseProfileName(accountName, deploymentName);
         var taken = new HashSet<string>(existingNames, StringComparer.OrdinalIgnoreCase);
 
         if (!taken.Contains(baseName))
