@@ -245,9 +245,18 @@ On re-import, equivalent profiles are deduplicated automatically.
 | `--max-output-tokens <n>` | Set `maxOutputTokens` on imported profiles |
 | `--max-prompt-tokens <n>` | Set `maxPromptTokens` on imported profiles |
 
-When `import-foundry` runs in fully interactive mode (no `--mode`/`--all` and no token-limit flags), it asks once for optional default token limits.
+When `import-foundry` runs in fully interactive mode (no `--mode`/`--all` and no token-limit flags), it asks once for optional fallback token limits.
 
-In `--mode each` (interactive per deployment), you can override those defaults per deployment before profile creation.
+Token suggestion precedence during import is:
+- Explicit CLI flags (`--max-output-tokens` / `--max-prompt-tokens`)
+- Deployment metadata fields (for example model token metadata when present)
+- Azure deployment rate limits from `properties.rateLimits` (`key=token` for TPM, `key=request` for RPM)
+- Model-family heuristic defaults
+- Interactive fallback defaults (or not set)
+
+In `--mode each` (interactive per deployment), you can override the suggested values per deployment before profile creation.
+
+Import output also shows the suggestion source for each token value and prints discovered rate limits (`tpm` and `rpm`) for transparency.
 
 **Examples:**
 

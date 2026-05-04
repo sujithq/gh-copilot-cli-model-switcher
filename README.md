@@ -134,6 +134,9 @@ gh-copilot-byok import-foundry --all
 
 # Import from one account/resource group
 gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all
+
+# During import, token suggestions are auto-proposed from deployment metadata/rate limits
+# (rateLimits key=token for TPM and key=request for RPM), then can be overridden interactively.
 ```
 
 ## 🚢 Release Readiness
