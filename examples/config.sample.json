@@ -24,7 +24,9 @@
       "type": "byok",
       "baseUrl": "https://api.openai.com/v1",
       "apiKeyEnv": "OPENAI_API_KEY",
-      "model": "gpt-4"
+      "model": "gpt-4",
+      "maxOutputTokens": 4096,
+      "maxPromptTokens": 64000
     },
     {
       "name": "azure-rbac-local",

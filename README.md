@@ -182,6 +182,8 @@ GitHub Copilot CLI can connect to external models via environment variables:
 - `COPILOT_PROVIDER_BEARER_TOKEN`
 - `COPILOT_MODEL`
 - `COPILOT_PROVIDER_TYPE`
+- `COPILOT_PROVIDER_MAX_OUTPUT_TOKENS`
+- `COPILOT_PROVIDER_MAX_PROMPT_TOKENS`
 
 gh-copilot-byok can now source Azure CLI access tokens when API keys are disabled. In token mode, it sets `COPILOT_PROVIDER_BEARER_TOKEN` and clears `COPILOT_PROVIDER_API_KEY` to avoid auth-mode ambiguity.
 
@@ -242,6 +244,15 @@ Example JSON content:
       "type": "byok",
       "baseUrl": "http://localhost:11434",
       "model": "llama3"
+    },
+    {
+      "name": "openai-token-metered",
+      "type": "byok",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "model": "gpt-5",
+      "maxOutputTokens": 4096,
+      "maxPromptTokens": 64000
     }
   ],
   "lastUsed": "azure-gpt"
@@ -268,7 +279,9 @@ Example JSON content:
   "type": "byok",
   "baseUrl": "https://api.openai.com/v1",
   "apiKeyEnv": "OPENAI_API_KEY",
-  "model": "gpt-4"
+  "model": "gpt-4",
+  "maxOutputTokens": 4096,
+  "maxPromptTokens": 64000
 }
 ```
 
@@ -277,12 +290,17 @@ Optional auth fields for `byok` and `proxy`:
 ```json
 {
   "azureCliToken": "auto",
-  "tokenScope": "https://cognitiveservices.azure.com/.default"
+  "tokenScope": "https://cognitiveservices.azure.com/.default",
+  "maxOutputTokens": 4096,
+  "maxPromptTokens": 64000
 }
 ```
 
 - `azureCliToken`: `auto` (default), `on`, or `off`
 - `tokenScope`: Azure token scope for `az account get-access-token`
+- `maxOutputTokens`: Optional cap for generated output tokens
+- `maxPromptTokens`: Optional cap for prompt/context tokens sent to the provider
+- `maxTokens`: Legacy alias for `maxOutputTokens`; still read for compatibility but new configs should use `maxOutputTokens`
 
 #### 3. `proxy` - Proxy Configuration
 
@@ -306,7 +324,8 @@ Optional auth fields for `byok` and `proxy`:
   "type": "byok",
   "baseUrl": "https://your-resource.openai.azure.com/openai/deployments/your-deployment",
   "apiKeyEnv": "AZURE_OPENAI_KEY",
-  "model": "gpt-4"
+  "model": "gpt-4",
+  "maxOutputTokens": 4096
 }
 ```
 

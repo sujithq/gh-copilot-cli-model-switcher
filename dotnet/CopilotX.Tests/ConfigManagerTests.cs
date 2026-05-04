@@ -154,6 +154,128 @@ public class ConfigManagerTests : IDisposable
         Assert.Equal("azure", profile.ProviderType);
         Assert.Equal("auto", profile.AzureCliToken);
         Assert.Equal("https://cognitiveservices.azure.com/.default", profile.TokenScope);
+        Assert.Null(profile.MaxOutputTokens);
+        Assert.Null(profile.MaxPromptTokens);
+    }
+
+    [Fact]
+    public void BuildImportedProfile_AppliesConfiguredTokenLimits()
+    {
+        var profile = FoundryImportHelpers.BuildImportedProfile(
+            "myfoundry",
+            "https://myfoundry.openai.azure.com/",
+            new FoundryDeployment
+            {
+                DeploymentName = "gpt-5-prod",
+                ModelName = "gpt-5",
+                ModelVersion = "2026-03-05"
+            },
+            Array.Empty<string>(),
+            maxOutputTokens: 4096,
+            maxPromptTokens: 64000);
+
+        Assert.Equal(4096, profile.MaxOutputTokens);
+        Assert.Equal(64000, profile.MaxPromptTokens);
+    }
+
+    [Fact]
+    public void AddProfile_PersistsTokenLimitSettings()
+    {
+        var profile = new Profile
+        {
+            Name = "openai-gpt",
+            Type = "byok",
+            BaseUrl = "https://api.openai.com/v1",
+            Model = "gpt-5",
+            MaxOutputTokens = 4096,
+            MaxPromptTokens = 120000
+        };
+
+        Assert.True(ConfigManager.AddProfile(profile));
+
+        var saved = ConfigManager.GetProfile("openai-gpt");
+
+        Assert.NotNull(saved);
+                Assert.Equal(4096, saved!.MaxOutputTokens);
+        Assert.Equal(120000, saved.MaxPromptTokens);
+    }
+
+        [Fact]
+        public void LoadConfig_ReadsLegacyMaxTokensAliasIntoMaxOutputTokens()
+        {
+                ConfigManager.EnsureConfigDir();
+                var configPath = ConfigManager.GetConfigFile();
+                File.WriteAllText(configPath, """
+                {
+                    "profiles": [
+                        {
+                            "name": "legacy-openai",
+                            "type": "byok",
+                            "baseUrl": "https://api.openai.com/v1",
+                            "model": "gpt-4.1",
+                            "maxTokens": 2048,
+                            "maxPromptTokens": 32000
+                        }
+                    ],
+                    "lastUsed": "legacy-openai"
+                }
+                """);
+
+                var profile = ConfigManager.GetProfile("legacy-openai");
+
+                Assert.NotNull(profile);
+                Assert.Equal(2048, profile!.MaxOutputTokens);
+                Assert.Equal(32000, profile.MaxPromptTokens);
+        }
+
+        [Fact]
+        public void SaveConfig_WritesCanonicalMaxOutputTokensField()
+        {
+                var profile = new Profile
+                {
+                        Name = "canonical-openai",
+                        Type = "byok",
+                        BaseUrl = "https://api.openai.com/v1",
+                        Model = "gpt-5",
+                        MaxOutputTokens = 8192,
+                        MaxPromptTokens = 64000
+                };
+
+                Assert.True(ConfigManager.AddProfile(profile));
+
+                var configJson = File.ReadAllText(ConfigManager.GetConfigFile());
+
+                Assert.Contains("\"maxOutputTokens\": 8192", configJson);
+                Assert.DoesNotContain("\"maxTokens\": 8192", configJson);
+        }
+
+    [Fact]
+    public void SetProviderTokenLimitEnvironment_SetsAndClearsEnvVars()
+    {
+        var previousMaxOutput = Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS");
+        var previousMaxPrompt = Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS");
+
+        try
+        {
+            CopilotX.Program.SetProviderTokenLimitEnvironment(new Profile
+            {
+                MaxOutputTokens = 8192,
+                MaxPromptTokens = 64000
+            });
+
+            Assert.Equal("8192", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS"));
+            Assert.Equal("64000", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS"));
+
+            CopilotX.Program.SetProviderTokenLimitEnvironment(new Profile());
+
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS"));
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", previousMaxOutput);
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", previousMaxPrompt);
+        }
     }
 
 }
