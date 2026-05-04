@@ -293,58 +293,58 @@ public class ConfigManagerTests : IDisposable
         var saved = ConfigManager.GetProfile("openai-gpt");
 
         Assert.NotNull(saved);
-                Assert.Equal(4096, saved!.MaxOutputTokens);
+        Assert.Equal(4096, saved!.MaxOutputTokens);
         Assert.Equal(120000, saved.MaxPromptTokens);
     }
 
-        [Fact]
-        public void LoadConfig_ReadsLegacyMaxTokensAliasIntoMaxOutputTokens()
+    [Fact]
+    public void LoadConfig_ReadsLegacyMaxTokensAliasIntoMaxOutputTokens()
+    {
+        ConfigManager.EnsureConfigDir();
+        var configPath = ConfigManager.GetConfigFile();
+        File.WriteAllText(configPath, """
         {
-                ConfigManager.EnsureConfigDir();
-                var configPath = ConfigManager.GetConfigFile();
-                File.WriteAllText(configPath, """
+            "profiles": [
                 {
-                    "profiles": [
-                        {
-                            "name": "legacy-openai",
-                            "type": "byok",
-                            "baseUrl": "https://api.openai.com/v1",
-                            "model": "gpt-4.1",
-                            "maxTokens": 2048,
-                            "maxPromptTokens": 32000
-                        }
-                    ],
-                    "lastUsed": "legacy-openai"
+                    "name": "legacy-openai",
+                    "type": "byok",
+                    "baseUrl": "https://api.openai.com/v1",
+                    "model": "gpt-4.1",
+                    "maxTokens": 2048,
+                    "maxPromptTokens": 32000
                 }
-                """);
-
-                var profile = ConfigManager.GetProfile("legacy-openai");
-
-                Assert.NotNull(profile);
-                Assert.Equal(2048, profile!.MaxOutputTokens);
-                Assert.Equal(32000, profile.MaxPromptTokens);
+            ],
+            "lastUsed": "legacy-openai"
         }
+        """);
 
-        [Fact]
-        public void SaveConfig_WritesCanonicalMaxOutputTokensField()
+        var profile = ConfigManager.GetProfile("legacy-openai");
+
+        Assert.NotNull(profile);
+        Assert.Equal(2048, profile!.MaxOutputTokens);
+        Assert.Equal(32000, profile.MaxPromptTokens);
+    }
+
+    [Fact]
+    public void SaveConfig_WritesCanonicalMaxOutputTokensField()
+    {
+        var profile = new Profile
         {
-                var profile = new Profile
-                {
-                        Name = "canonical-openai",
-                        Type = "byok",
-                        BaseUrl = "https://api.openai.com/v1",
-                        Model = "gpt-5",
-                        MaxOutputTokens = 8192,
-                        MaxPromptTokens = 64000
-                };
+            Name = "canonical-openai",
+            Type = "byok",
+            BaseUrl = "https://api.openai.com/v1",
+            Model = "gpt-5",
+            MaxOutputTokens = 8192,
+            MaxPromptTokens = 64000
+        };
 
-                Assert.True(ConfigManager.AddProfile(profile));
+        Assert.True(ConfigManager.AddProfile(profile));
 
-                var configJson = File.ReadAllText(ConfigManager.GetConfigFile());
+        var configJson = File.ReadAllText(ConfigManager.GetConfigFile());
 
-                Assert.Contains("\"maxOutputTokens\": 8192", configJson);
-                Assert.DoesNotContain("\"maxTokens\": 8192", configJson);
-        }
+        Assert.Contains("\"maxOutputTokens\": 8192", configJson);
+        Assert.DoesNotContain("\"maxTokens\": 8192", configJson);
+    }
 
     [Fact]
     public void SetProviderTokenLimitEnvironment_SetsAndClearsEnvVars()
