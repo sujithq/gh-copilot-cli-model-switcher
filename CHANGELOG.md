@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.3.0](https://github.com/sujithq/gh-copilot-cli-model-switcher/compare/copilot-byok-model-switcher-v2.2.0...copilot-byok-model-switcher-v2.3.0) (2026-05-04)
+
+
+### Features
+
+* add BuildBaseProfileName method and update profile handling with optional token limits ([ed4f702](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/ed4f702e5cd95630580092fdc143916968a8040e))
+* add support for max output and prompt tokens in profiles and CLI ([aefcc0b](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/aefcc0b99eaf07bdb2c7bff271f685282264585b))
+* add token limits display in profile formatting and tests ([2e90cf4](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/2e90cf49c148f1b743bdf06c285b45f95213116b))
+* enhance import-foundry with token suggestion sources and fallback limits ([443444f](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/443444f3a59306202d274786d3b21075e643910f))
+* implement token limits extraction and handling in deployment mapping ([22d3a6c](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/22d3a6ceefaa89afdd1a35ab780df3a416ffeef5))
+
+
+### Bug Fixes
+
+* correct indentation in ConfigManagerTests.cs per review feedback ([a5d7db6](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/a5d7db611a12eaca836a9309bb1cd232483863f4))
+* Potential fix for pull request finding ([2421ee6](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/2421ee6ac34233fa70158396e80875ef4985bcaa))
+* Potential fix for pull request finding ([c509997](https://github.com/sujithq/gh-copilot-cli-model-switcher/commit/c509997f15203beb024c49235b452e8881f98d42))
+
 ## [2.2.0](https://github.com/sujithq/gh-copilot-cli-model-switcher/compare/copilot-byok-model-switcher-v2.1.0...copilot-byok-model-switcher-v2.2.0) (2026-05-03)
 
 
