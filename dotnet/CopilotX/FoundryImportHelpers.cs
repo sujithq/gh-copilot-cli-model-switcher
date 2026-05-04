@@ -121,7 +121,13 @@ internal static class FoundryImportHelpers
         return $"{baseName}-{counter}";
     }
 
-    internal static Profile BuildImportedProfile(string accountName, string endpoint, FoundryDeployment deployment, IEnumerable<string> existingNames)
+    internal static Profile BuildImportedProfile(
+        string accountName,
+        string endpoint,
+        FoundryDeployment deployment,
+        IEnumerable<string> existingNames,
+        int? maxOutputTokens = null,
+        int? maxPromptTokens = null)
     {
         var normalizedEndpoint = (string.IsNullOrWhiteSpace(endpoint)
             ? $"https://{accountName}.openai.azure.com"
@@ -136,7 +142,9 @@ internal static class FoundryImportHelpers
             Model = deployment.DeploymentName,
             ProviderType = "azure",
             AzureCliToken = "auto",
-            TokenScope = "https://cognitiveservices.azure.com/.default"
+            TokenScope = "https://cognitiveservices.azure.com/.default",
+            MaxOutputTokens = maxOutputTokens,
+            MaxPromptTokens = maxPromptTokens
         };
     }
 

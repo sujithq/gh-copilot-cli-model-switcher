@@ -242,6 +242,10 @@ On re-import, equivalent profiles are deduplicated automatically.
 | `--subscription <id\|name>` | Scope discovery to a specific subscription |
 | `--mode each\|all` | Prompt per deployment (`each`) or add all without prompts (`all`) |
 | `--all` | Shorthand for `--mode all` |
+| `--max-output-tokens <n>` | Set `maxOutputTokens` on imported profiles |
+| `--max-prompt-tokens <n>` | Set `maxPromptTokens` on imported profiles |
+
+When `import-foundry` runs in fully interactive mode (no `--mode`/`--all` and no token-limit flags), it asks once for optional default token limits and applies them to all selected imports.
 
 **Examples:**
 
@@ -254,6 +258,9 @@ gh-copilot-byok import-foundry --mode each
 
 # Add all deployments without prompt
 gh-copilot-byok import-foundry --all
+
+# Add all deployments with explicit token limits
+gh-copilot-byok import-foundry --all --max-output-tokens 4096 --max-prompt-tokens 64000
 
 # Target one account/resource group
 gh-copilot-byok import-foundry --account myfoundry --resource-group my-rg --all
@@ -340,6 +347,9 @@ Fields:
 - `providerType`: Optional provider type
 - `azureCliToken`: Optional token mode (`auto`, `on`, `off`)
 - `tokenScope`: Optional Azure token scope
+- `maxOutputTokens`: Optional max output tokens, mapped to `COPILOT_PROVIDER_MAX_OUTPUT_TOKENS`
+- `maxPromptTokens`: Optional max prompt tokens, mapped to `COPILOT_PROVIDER_MAX_PROMPT_TOKENS`
+- `maxTokens`: Legacy alias for `maxOutputTokens`; read for compatibility but not written to new configs
 
 #### `proxy` (Proxy Configuration)
 
@@ -362,8 +372,12 @@ gh copilot
 export COPILOT_PROVIDER_BASE_URL=<url>
 export COPILOT_PROVIDER_API_KEY=<key>
 export COPILOT_MODEL=<model>
+export COPILOT_PROVIDER_MAX_OUTPUT_TOKENS=<max output tokens>
+export COPILOT_PROVIDER_MAX_PROMPT_TOKENS=<max prompt tokens>
 gh copilot
 ```
+
+`maxOutputTokens` is useful when you want to cap generated output as Copilot CLI usage shifts from request-based to token-based accounting. If you also need to constrain how much context is sent to the provider, set `maxPromptTokens`.
 
 If `azureCliToken` is enabled (or `auto` detects Azure profile with no API key), gh-copilot-byok runs:
 

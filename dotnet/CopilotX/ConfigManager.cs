@@ -33,6 +33,26 @@ public class Profile
     [JsonPropertyName("tokenScope")]
     public string? TokenScope { get; set; }
 
+    [JsonPropertyName("maxOutputTokens")]
+    public int? MaxOutputTokens { get; set; }
+
+    [JsonPropertyName("maxTokens")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MaxTokens
+    {
+        get => null;
+        set
+        {
+            if (!MaxOutputTokens.HasValue)
+            {
+                MaxOutputTokens = value;
+            }
+        }
+    }
+
+    [JsonPropertyName("maxPromptTokens")]
+    public int? MaxPromptTokens { get; set; }
+
     [JsonPropertyName("mcpCompatServers")]
     public List<string>? McpCompatServers { get; set; }
 }
@@ -298,6 +318,8 @@ public class ConfigManager
             providerType = Normalize(profile.ProviderType),
             azureCliToken = Normalize(profile.AzureCliToken),
             tokenScope = Normalize(profile.TokenScope),
+            maxOutputTokens = profile.MaxOutputTokens,
+            maxPromptTokens = profile.MaxPromptTokens,
             mcpCompatServers = NormalizeMcpServers(profile)
         };
 
@@ -340,6 +362,8 @@ public class ConfigManager
                 ProviderType = profile.ProviderType,
                 AzureCliToken = profile.AzureCliToken,
                 TokenScope = profile.TokenScope,
+                MaxOutputTokens = profile.MaxOutputTokens,
+                MaxPromptTokens = profile.MaxPromptTokens,
                 McpCompatServers = profile.McpCompatServers
             };
 

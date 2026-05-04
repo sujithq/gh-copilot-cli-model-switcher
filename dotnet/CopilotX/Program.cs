@@ -100,6 +100,8 @@ class Program
         ifTable.AddRow("[cyan]--subscription <id|name>[/]", "Scope discovery to a specific subscription");
         ifTable.AddRow("[cyan]--mode each|all[/]", "Prompt per deployment (each) or add all without prompts (all)");
         ifTable.AddRow("[cyan]--all[/]", "Shorthand for --mode all");
+        ifTable.AddRow("[cyan]--max-output-tokens <n>[/]", "Set max output tokens on imported profiles");
+        ifTable.AddRow("[cyan]--max-prompt-tokens <n>[/]", "Set max prompt tokens on imported profiles");
         AnsiConsole.Write(ifTable);
 
         AnsiConsole.MarkupLine("\n[bold]Azure BYOK MCP compat mode[/]");
@@ -848,6 +850,61 @@ class Program
         return token;
     }
 
+    internal static void SetProviderTokenLimitEnvironment(Profile profile)
+    {
+        if (profile.MaxOutputTokens.HasValue)
+        {
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", profile.MaxOutputTokens.Value.ToString());
+        }
+        else
+        {
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", null);
+        }
+
+        if (profile.MaxPromptTokens.HasValue)
+        {
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", profile.MaxPromptTokens.Value.ToString());
+        }
+        else
+        {
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", null);
+        }
+    }
+
+    static int? AskOptionalInt(string prompt)
+    {
+        while (true)
+        {
+            var input = AnsiConsole.Ask<string>(prompt, string.Empty).Trim();
+            if (string.IsNullOrEmpty(input))
+            {
+                return null;
+            }
+
+            if (int.TryParse(input, out var value) && value > 0)
+            {
+                return value;
+            }
+
+            AnsiConsole.MarkupLine("[red]Please enter a positive integer or leave it blank.[/]");
+        }
+    }
+
+    static int? ParseOptionalPositiveIntOption(string? rawValue, string optionName)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return null;
+        }
+
+        if (int.TryParse(rawValue, out var value) && value > 0)
+        {
+            return value;
+        }
+
+        throw new InvalidOperationException($"Option --{optionName} must be a positive integer.");
+    }
+
     static async Task<AuthEnvironmentResult> SetEnvironmentForProfile(Profile profile)
     {
         if (profile.Type == "copilot")
@@ -857,6 +914,8 @@ class Program
             Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", null);
             Environment.SetEnvironmentVariable("COPILOT_MODEL", null);
             Environment.SetEnvironmentVariable("COPILOT_PROVIDER_TYPE", null);
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", null);
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", null);
             return new AuthEnvironmentResult { UsedAzureCliToken = false };
         }
         else if (profile.Type == "byok" || profile.Type == "proxy")
@@ -925,6 +984,8 @@ class Program
             {
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_TYPE", profile.ProviderType);
             }
+
+            SetProviderTokenLimitEnvironment(profile);
 
             return new AuthEnvironmentResult { UsedAzureCliToken = useAzureCliToken };
         }
@@ -1119,6 +1180,9 @@ class Program
             {
                 profile.TokenScope = AnsiConsole.Ask<string>("Azure token [cyan]scope[/] (optional):", string.Empty);
             }
+
+            profile.MaxOutputTokens = AskOptionalInt("Max [cyan]output tokens[/] (optional):");
+            profile.MaxPromptTokens = AskOptionalInt("Max [cyan]prompt tokens[/] (optional):");
         }
 
         var upsert = ConfigManager.UpsertProfile(profile);
@@ -1334,9 +1398,12 @@ class Program
             AnsiConsole.MarkupLine("  --subscription <id|name>   Limit discovery to one subscription");
             AnsiConsole.MarkupLine("  --mode each|all            Prompt per deployment or add all");
             AnsiConsole.MarkupLine("  --all                      Add all discovered deployments without prompts\n");
+            AnsiConsole.MarkupLine("  --max-output-tokens <n>    Set max output tokens on imported profiles");
+            AnsiConsole.MarkupLine("  --max-prompt-tokens <n>    Set max prompt tokens on imported profiles\n");
             AnsiConsole.MarkupLine("[cyan]Examples:[/]");
             AnsiConsole.MarkupLine("  copilot-byok-model-switcher import-foundry --mode each");
             AnsiConsole.MarkupLine("  copilot-byok-model-switcher import-foundry --all");
+            AnsiConsole.MarkupLine("  copilot-byok-model-switcher import-foundry --all --max-output-tokens 4096 --max-prompt-tokens 64000");
             AnsiConsole.MarkupLine("  copilot-byok-model-switcher import-foundry --account myfoundry --resource-group my-rg --all");
             return 0;
         }
@@ -1346,6 +1413,11 @@ class Program
         options.TryGetValue("resource-group", out var resourceGroup);
         options.TryGetValue("subscription", out var subscription);
         options.TryGetValue("mode", out var mode);
+        options.TryGetValue("max-output-tokens", out var maxOutputTokensRaw);
+        options.TryGetValue("max-prompt-tokens", out var maxPromptTokensRaw);
+
+        var maxOutputTokens = ParseOptionalPositiveIntOption(maxOutputTokensRaw, "max-output-tokens");
+        var maxPromptTokens = ParseOptionalPositiveIntOption(maxPromptTokensRaw, "max-prompt-tokens");
 
         var addAll = options.ContainsKey("all");
         var effectiveMode = addAll ? "all" : (mode ?? string.Empty).Trim().ToLowerInvariant();
@@ -1355,6 +1427,18 @@ class Program
                 new SelectionPrompt<string>()
                     .Title("Import mode:")
                     .AddChoices(new[] { "each", "all" }));
+        }
+
+        var shouldPromptForTokenLimits =
+            !options.ContainsKey("mode")
+            && !options.ContainsKey("all")
+            && !options.ContainsKey("max-output-tokens")
+            && !options.ContainsKey("max-prompt-tokens");
+
+        if (shouldPromptForTokenLimits)
+        {
+            maxOutputTokens = AskOptionalInt("Default max [cyan]output tokens[/] for imported profiles (optional):");
+            maxPromptTokens = AskOptionalInt("Default max [cyan]prompt tokens[/] for imported profiles (optional):");
         }
 
         try
@@ -1386,6 +1470,10 @@ class Program
             var imported = 0;
             var scanned = 0;
             var existingNames = new HashSet<string>(ConfigManager.ListProfiles().Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
+
+            var outputLabel = maxOutputTokens.HasValue ? maxOutputTokens.Value.ToString() : "not set";
+            var promptLabel = maxPromptTokens.HasValue ? maxPromptTokens.Value.ToString() : "not set";
+            AnsiConsole.MarkupLine($"[dim]Import token limits: output={EscapeMarkup(outputLabel)}, prompt={EscapeMarkup(promptLabel)}[/]");
 
             foreach (var foundryAccount in accounts)
             {
@@ -1433,7 +1521,13 @@ class Program
                         continue;
                     }
 
-                    var profile = FoundryImportHelpers.BuildImportedProfile(foundryAccount.Name, endpoint, deployment, existingNames);
+                    var profile = FoundryImportHelpers.BuildImportedProfile(
+                        foundryAccount.Name,
+                        endpoint,
+                        deployment,
+                        existingNames,
+                        maxOutputTokens,
+                        maxPromptTokens);
                     var profileName = profile.Name;
 
                     var upsert = ConfigManager.UpsertProfile(profile);
