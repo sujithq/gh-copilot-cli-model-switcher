@@ -63,12 +63,6 @@ internal static class FoundryImportHelpers
         var (suggestedMaxOutputTokens, suggestedMaxPromptTokens, outputSource, promptSource) =
             ExtractSuggestedTokenLimits(item, modelName, deploymentName);
 
-        if (!suggestedMaxPromptTokens.HasValue && suggestedTpm.HasValue)
-        {
-            suggestedMaxPromptTokens = suggestedTpm;
-            promptSource = "rate-limit-token";
-        }
-
         return new FoundryDeployment
         {
             DeploymentName = deploymentName,
