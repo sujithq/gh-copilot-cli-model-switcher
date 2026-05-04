@@ -112,55 +112,55 @@ public class ConfigManagerTests : IDisposable
         Assert.Equal(string.Empty, deployment.ModelVersion);
     }
 
-        [Fact]
-        public void MapDeployment_ReadsSuggestedTokenLimits_FromMetadata()
+    [Fact]
+    public void MapDeployment_ReadsSuggestedTokenLimits_FromMetadata()
+    {
+        using var doc = JsonDocument.Parse("""
         {
-                using var doc = JsonDocument.Parse("""
-                {
-                    "name": "gpt-5-prod",
-                    "properties": {
-                        "model": {
-                            "name": "gpt-5",
-                            "version": "2026-03-01",
-                            "maxOutputTokens": 8192
-                        },
-                        "capabilities": {
-                            "maxInputTokens": "128000"
-                        }
-                    }
+            "name": "gpt-5-prod",
+            "properties": {
+                "model": {
+                    "name": "gpt-5",
+                    "version": "2026-03-01",
+                    "maxOutputTokens": 8192
+                },
+                "capabilities": {
+                    "maxInputTokens": "128000"
                 }
-                """);
-
-                var deployment = FoundryImportHelpers.MapDeployment(doc.RootElement);
-
-                Assert.Equal(8192, deployment.SuggestedMaxOutputTokens);
-                Assert.Equal(128000, deployment.SuggestedMaxPromptTokens);
-                Assert.Equal("metadata", deployment.SuggestedMaxOutputTokensSource);
-                Assert.Equal("metadata", deployment.SuggestedMaxPromptTokensSource);
-        }
-
-            [Fact]
-            public void MapDeployment_UsesModelFamilyHeuristics_WhenMetadataTokenLimitsMissing()
-            {
-                using var doc = JsonDocument.Parse("""
-                {
-                    "name": "gpt-4.1-prod",
-                    "properties": {
-                        "model": {
-                            "name": "gpt-4.1",
-                            "version": "2025-04-14"
-                        }
-                    }
-                }
-                """);
-
-                var deployment = FoundryImportHelpers.MapDeployment(doc.RootElement);
-
-                Assert.Equal(8192, deployment.SuggestedMaxOutputTokens);
-                Assert.Equal(128000, deployment.SuggestedMaxPromptTokens);
-                Assert.Equal("model-family", deployment.SuggestedMaxOutputTokensSource);
-                Assert.Equal("model-family", deployment.SuggestedMaxPromptTokensSource);
             }
+        }
+        """);
+
+        var deployment = FoundryImportHelpers.MapDeployment(doc.RootElement);
+
+        Assert.Equal(8192, deployment.SuggestedMaxOutputTokens);
+        Assert.Equal(128000, deployment.SuggestedMaxPromptTokens);
+        Assert.Equal("metadata", deployment.SuggestedMaxOutputTokensSource);
+        Assert.Equal("metadata", deployment.SuggestedMaxPromptTokensSource);
+    }
+
+    [Fact]
+    public void MapDeployment_UsesModelFamilyHeuristics_WhenMetadataTokenLimitsMissing()
+    {
+        using var doc = JsonDocument.Parse("""
+        {
+            "name": "gpt-4.1-prod",
+            "properties": {
+                "model": {
+                    "name": "gpt-4.1",
+                    "version": "2025-04-14"
+                }
+            }
+        }
+        """);
+
+        var deployment = FoundryImportHelpers.MapDeployment(doc.RootElement);
+
+        Assert.Equal(8192, deployment.SuggestedMaxOutputTokens);
+        Assert.Equal(128000, deployment.SuggestedMaxPromptTokens);
+        Assert.Equal("model-family", deployment.SuggestedMaxOutputTokensSource);
+        Assert.Equal("model-family", deployment.SuggestedMaxPromptTokensSource);
+    }
 
     [Fact]
     public void MapDeployment_ReadsRateLimits_ForGpt54AndKimi()
