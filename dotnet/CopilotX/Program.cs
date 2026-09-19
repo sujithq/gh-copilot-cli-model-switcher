@@ -1556,7 +1556,11 @@ class Program
                         if ((EnterpriseAuth.IsEntra(existingCanonical) &&
                              EnterpriseAuth.WireModel(existingCanonical) == deployment.DeploymentName &&
                              string.Equals(existingBaseUrl, expectedBaseUrl, StringComparison.OrdinalIgnoreCase)) ||
-                            string.Equals(existingBaseUrl, expectedLegacyBaseUrl, StringComparison.OrdinalIgnoreCase))
+                            (string.Equals(existingCanonical.Type, "byok", StringComparison.OrdinalIgnoreCase) &&
+                             string.Equals(existingCanonical.ProviderType, "azure", StringComparison.OrdinalIgnoreCase) &&
+                             string.Equals(existingCanonical.AzureCliToken, "auto", StringComparison.OrdinalIgnoreCase) &&
+                             EnterpriseAuth.WireModel(existingCanonical) == deployment.DeploymentName &&
+                             string.Equals(existingBaseUrl, expectedLegacyBaseUrl, StringComparison.OrdinalIgnoreCase)))
                         {
                             profile.Name = canonicalName;
                         }
