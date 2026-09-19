@@ -1552,9 +1552,11 @@ class Program
                     {
                         var expectedBaseUrl = profile.BaseUrl;
                         var existingBaseUrl = (existingCanonical.BaseUrl ?? string.Empty).TrimEnd('/');
-                        if (EnterpriseAuth.IsEntra(existingCanonical) &&
-                            EnterpriseAuth.WireModel(existingCanonical) == deployment.DeploymentName &&
-                            string.Equals(existingBaseUrl, expectedBaseUrl, StringComparison.OrdinalIgnoreCase))
+                        var expectedLegacyBaseUrl = $"{endpoint}/openai/deployments/{deployment.DeploymentName}";
+                        if ((EnterpriseAuth.IsEntra(existingCanonical) &&
+                             EnterpriseAuth.WireModel(existingCanonical) == deployment.DeploymentName &&
+                             string.Equals(existingBaseUrl, expectedBaseUrl, StringComparison.OrdinalIgnoreCase)) ||
+                            string.Equals(existingBaseUrl, expectedLegacyBaseUrl, StringComparison.OrdinalIgnoreCase))
                         {
                             profile.Name = canonicalName;
                         }
