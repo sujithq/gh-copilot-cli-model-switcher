@@ -253,7 +253,7 @@ public class ConfigManagerTests : IDisposable
         Assert.Null(profile.AzureCliToken);
         Assert.Null(profile.TokenScope);
         Assert.Equal("entra", profile.Authentication!.Type);
-        Assert.Equal("https://cognitiveservices.azure.com", profile.Authentication.Resource);
+        Assert.Equal("https://ai.azure.com", profile.Authentication.Resource);
         Assert.Null(profile.MaxOutputTokens);
         Assert.Null(profile.MaxPromptTokens);
     }
@@ -276,6 +276,21 @@ public class ConfigManagerTests : IDisposable
 
         Assert.Equal(4096, profile.MaxOutputTokens);
         Assert.Equal(64000, profile.MaxPromptTokens);
+    }
+
+    [Fact]
+    public void BuildImportedProfile_NormalizesOpenAIEndpointAndSeparatesDeployment()
+    {
+        foreach (var endpoint in new[] { "https://example.com/", "https://example.com/openai/v1/", "https://example.com/openai/deployments/production" })
+        {
+            var profile = FoundryImportHelpers.BuildImportedProfile("account", endpoint,
+                new FoundryDeployment { ModelName = "logical", DeploymentName = "production" }, []);
+            Assert.Equal("https://example.com/openai/v1", profile.BaseUrl);
+            Assert.Equal("logical", profile.Model);
+            Assert.Equal("production", profile.Deployment);
+            Assert.Equal("azure", profile.ProviderType);
+            Assert.Equal("https://ai.azure.com", profile.Authentication!.Resource);
+        }
     }
 
     [Fact]
@@ -406,7 +421,7 @@ public class ConfigManagerTests : IDisposable
     {
         Profile Make(string name, string deployment, string resource) => new()
         {
-            Name = name, Type = "byok", BaseUrl = "https://example.com", Model = "logical",
+            Name = name, Type = "byok", BaseUrl = "https://example.com/openai/v1", Model = "logical",
             Deployment = deployment, Authentication = new() { Type = "entra", Resource = resource, Preflight = true }
         };
         Assert.True(ConfigManager.AddProfile(Make("a", "prod", "https://ai.azure.com")));

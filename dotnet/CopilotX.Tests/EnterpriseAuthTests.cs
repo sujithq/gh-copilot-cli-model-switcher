@@ -17,7 +17,7 @@ public sealed class EnterpriseAuthTests : IDisposable
     static Profile Profile() => new()
     {
         Name = "enterprise", Type = "byok", Model = "logical-model", Deployment = "production",
-        BaseUrl = "https://example.openai.azure.com",
+        BaseUrl = "https://example.openai.azure.com/openai/v1",
         Authentication = new ProfileAuthentication { Type = "entra", Tenant = Tenant }
     };
     static string TokenJson(long seconds = 3600, string tenant = Tenant) => JsonSerializer.Serialize(new
@@ -25,11 +25,11 @@ public sealed class EnterpriseAuthTests : IDisposable
         accessToken = Secret, expires_on = (Now.ToUnixTimeSeconds() + seconds).ToString(), tenant
     });
     static AzureResult Account(string tenant = Tenant) => new(0, JsonSerializer.Serialize(new { tenantId = tenant }));
-    Dictionary<string, string?> EnvironmentFor(string? content = "{}")
+    Dictionary<string, string?> EnvironmentFor(string? content = null)
     {
         var registry = Path.Combine(directory, "providers.json");
         if (content != null) File.WriteAllText(registry, content);
-        return new() { ["COPILOT_PROVIDERS_CONFIG"] = registry, ["PATH"] = "unchanged" };
+        return new() { ["COPILOT_HOME"] = directory, ["PATH"] = "unchanged" };
     }
     static Func<IReadOnlyList<string>, Task<AzureResult>> Azure(List<string[]> calls, params AzureResult[] results)
     {
@@ -77,7 +77,7 @@ public sealed class EnterpriseAuthTests : IDisposable
     public void Validate_AllowsLegacyLocalEndpointsAndExplicitApiKey()
     {
         EnterpriseAuth.Validate(new Profile { Type = "proxy", BaseUrl = "http://localhost:8080", ApiKey = "key" });
-        var profile = Profile(); profile.Authentication!.Type = "apiKey"; profile.ApiKeyEnv = "KEY";
+        var profile = Profile(); profile.Authentication!.Type = "apiKey"; profile.ApiKeyEnv = "KEY"; profile.BaseUrl = "http://localhost:11434/v1";
         EnterpriseAuth.Validate(profile);
     }
 
@@ -141,6 +141,24 @@ public sealed class EnterpriseAuthTests : IDisposable
         Assert.True(windows.RedirectStandardError);
         foreach (var suffix in new[] { "%SECRET%", "!SECRET!", "\"", "&command", "|command", "^", "<file", ">file", "\r", "\n" })
             Assert.Throws<InvalidOperationException>(() => EnterpriseAuth.AzureStartInfo(["--resource", "https://example.com/" + suffix], true));
+    }
+
+    [Fact]
+    public void AzureRunner_LoginInheritsTerminalButTokenOutputIsAlwaysCaptured()
+    {
+        foreach (var windows in new[] { false, true })
+        {
+            var login = EnterpriseAuth.AzureStartInfo(["login", "--output", "none", "--tenant", Tenant], windows, interactiveLogin: true);
+            Assert.False(login.UseShellExecute);
+            Assert.False(login.RedirectStandardInput);
+            Assert.False(login.RedirectStandardOutput);
+            Assert.False(login.RedirectStandardError);
+            var token = EnterpriseAuth.AzureStartInfo(["account", "get-access-token", "--output", "json"], windows);
+            Assert.True(token.RedirectStandardOutput);
+            Assert.True(token.RedirectStandardError);
+            Assert.Throws<InvalidOperationException>(() => EnterpriseAuth.AzureStartInfo(
+                ["account", "get-access-token"], windows, interactiveLogin: true));
+        }
     }
 
     [Fact]
@@ -219,35 +237,45 @@ public sealed class EnterpriseAuthTests : IDisposable
     }
 
     [Fact]
-    public void Registry_RejectsNonemptyMalformedUnknownUnreadableAndMissingExplicit()
+    public void Registry_RejectsEveryExistingRegistryWithoutChangingFiles()
     {
-        foreach (var content in new[] { "", "oops", "[]", """{"providers":[{"name":"other"}]}""",
-                     """{"models":{"other":{}}}""", """{"providers":null}""", """{"unknown":{}}""" })
+        foreach (var content in new[] { "", "{}", "oops", "[]", """{"providers":[]}""", """{"providers":{},"models":[]}""",
+                     """{"providers":[{"name":"other"}]}""", """{"models":{"other":{}}}""",
+                     """{"providers":null}""", """{"unknown":{}}""", """{"$schema":"https://example.com/schema","version":1}""" })
         {
             var env = EnvironmentFor(content);
             var error = Assert.Throws<InvalidOperationException>(() => EnterpriseAuth.GuardRegistry(env, directory));
             Assert.Contains("precedence", error.Message);
             Assert.Contains("COPILOT_PROVIDERS_CONFIG", error.Message);
-            Assert.Equal(content, File.ReadAllText(env["COPILOT_PROVIDERS_CONFIG"]!));
+            Assert.Contains("stricter", error.Message);
+            Assert.Equal(content, File.ReadAllText(Path.Combine(directory, "providers.json")));
         }
+    }
+
+    [Fact]
+    public void Registry_RejectsEveryExplicitOverrideEvenMissingOrEmpty()
+    {
         var missing = new Dictionary<string, string?> { ["COPILOT_PROVIDERS_CONFIG"] = Path.Combine(directory, "missing") };
         Assert.Throws<InvalidOperationException>(() => EnterpriseAuth.GuardRegistry(missing, directory));
         missing["COPILOT_PROVIDERS_CONFIG"] = directory;
         Assert.Throws<InvalidOperationException>(() => EnterpriseAuth.GuardRegistry(missing, directory));
+        missing["COPILOT_PROVIDERS_CONFIG"] = "";
+        Assert.Throws<InvalidOperationException>(() => EnterpriseAuth.GuardRegistry(missing, directory));
     }
 
     [Fact]
-    public void Registry_AllowsEmptyAndMissingDefaultHonorsPrecedence()
+    public void Registry_AllowsOnlyMissingDefaultAndHonorsCopilotHome()
     {
-        foreach (var content in new[] { "{}", """{"providers":[]}""", """{"providers":{},"models":[]}""" })
-            EnterpriseAuth.GuardRegistry(EnvironmentFor(content), directory);
         EnterpriseAuth.GuardRegistry(new Dictionary<string, string?>(), directory);
         var home = Path.Combine(directory, "custom");
         Directory.CreateDirectory(home);
-        File.WriteAllText(Path.Combine(home, "providers.json"), """{"providers":["blocked"]}""");
-        Assert.Throws<InvalidOperationException>(() => EnterpriseAuth.GuardRegistry(new Dictionary<string, string?> { ["COPILOT_HOME"] = home }, directory));
-        var env = EnvironmentFor("{}"); env["COPILOT_HOME"] = home;
+        var env = new Dictionary<string, string?> { ["COPILOT_HOME"] = home };
         EnterpriseAuth.GuardRegistry(env, directory);
+        File.WriteAllText(Path.Combine(home, "providers.json"), """{"providers":["blocked"]}""");
+        Assert.Throws<InvalidOperationException>(() => EnterpriseAuth.GuardRegistry(env, directory));
+        File.Delete(Path.Combine(home, "providers.json"));
+        Directory.CreateDirectory(Path.Combine(home, "providers.json"));
+        Assert.Throws<InvalidOperationException>(() => EnterpriseAuth.GuardRegistry(env, directory));
     }
 
     [Fact]
@@ -277,6 +305,7 @@ public sealed class EnterpriseAuthTests : IDisposable
         Assert.Equal("logical-model", result.Environment["COPILOT_PROVIDER_MODEL_ID"]);
         Assert.Equal("production", result.Environment["COPILOT_PROVIDER_WIRE_MODEL"]);
         Assert.Equal("production", result.Environment["COPILOT_MODEL"]);
+        Assert.Equal("azure", result.Environment["COPILOT_PROVIDER_TYPE"]);
         Assert.False(result.Environment.ContainsKey("COPILOT_PROVIDER_API_KEY"));
         Assert.False(result.Environment.ContainsKey("COPILOT_PROVIDER_API_KEY_COMMAND"));
         Assert.False(result.Environment.ContainsKey("COPILOT_PROVIDER_UNKNOWN_FUTURE"));
@@ -284,6 +313,16 @@ public sealed class EnterpriseAuthTests : IDisposable
         Assert.Equal("old", env["COPILOT_PROVIDER_API_KEY"]);
         Assert.Equal(before, EnterpriseAuth.CopyEnvironment());
         Assert.DoesNotContain(Secret, JsonSerializer.Serialize(profile));
+    }
+
+    [Fact]
+    public async Task Environment_EntraPreservesExplicitProviderType()
+    {
+        var profile = Profile();
+        profile.ProviderType = "openai";
+        var result = await CopilotX.Program.SetEnvironmentForProfile(profile, inherited: EnvironmentFor(),
+            runAzure: Azure(new(), Account(), new(0, TokenJson())), now: () => Now);
+        Assert.Equal("openai", result.Environment["COPILOT_PROVIDER_TYPE"]);
     }
 
     [Fact]
@@ -347,12 +386,19 @@ public sealed class EnterpriseAuthTests : IDisposable
     }
 
     [Fact]
-    public void Preflight_NormalizesRootV1AndDeploymentEndpoints()
+    public void Preflight_RequiresExplicitV1SurfaceRatherThanRewritingEndpoints()
     {
-        foreach (var endpoint in new[] { "https://example.com", "https://example.com/", "https://example.com/openai/v1/", "https://example.com/openai/deployments/prod" })
+        foreach (var endpoint in new[] { "https://example.com/openai/v1", "https://example.com/openai/v1/" })
         {
             var profile = Profile(); profile.BaseUrl = endpoint;
             Assert.Equal("https://example.com/openai/v1/chat/completions", EnterpriseAuth.PreflightEndpoint(profile).ToString());
+        }
+        foreach (var endpoint in new[] { "https://example.com", "https://example.com/", "https://example.com/openai/deployments/prod", "https://example.com/models" })
+        {
+            var profile = Profile(); profile.BaseUrl = endpoint;
+            Assert.Throws<InvalidOperationException>(() => EnterpriseAuth.PreflightEndpoint(profile));
+            profile.Authentication!.Preflight = true;
+            Assert.Throws<InvalidOperationException>(() => EnterpriseAuth.Validate(profile));
         }
     }
 

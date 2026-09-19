@@ -979,9 +979,11 @@ class Program
                 environment["COPILOT_PROVIDER_API_KEY"] = resolvedApiKey;
             }
 
-            if (!string.IsNullOrEmpty(profile.ProviderType))
+            var providerType = string.IsNullOrWhiteSpace(profile.ProviderType) && EnterpriseAuth.IsEntra(profile)
+                ? "azure" : profile.ProviderType;
+            if (!string.IsNullOrEmpty(providerType))
             {
-                environment["COPILOT_PROVIDER_TYPE"] = profile.ProviderType;
+                environment["COPILOT_PROVIDER_TYPE"] = providerType;
             }
 
             SetProviderTokenLimitEnvironment(profile, environment);
@@ -1131,7 +1133,7 @@ class Program
             {
                 var tenant = AnsiConsole.Ask<string>("Entra [cyan]tenant UUID[/] (optional):", string.Empty);
                 profile.Authentication!.Tenant = string.IsNullOrWhiteSpace(tenant) ? null : tenant;
-                profile.Authentication.Resource = AnsiConsole.Ask<string>("Entra [cyan]resource[/] (Azure OpenAI: https://cognitiveservices.azure.com):", EnterpriseAuth.DefaultResource);
+                profile.Authentication.Resource = AnsiConsole.Ask<string>("Entra [cyan]resource[/] (override only when required by the endpoint):", EnterpriseAuth.DefaultResource);
                 profile.Authentication.Preflight = AnsiConsole.Confirm("Enable a minimal [yellow]billed[/] inference preflight?", false);
             }
             else

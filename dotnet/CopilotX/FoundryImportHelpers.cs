@@ -358,14 +358,14 @@ internal static class FoundryImportHelpers
         {
             Name = BuildUniqueProfileName(accountName, deployment.DeploymentName, existingNames),
             Type = "byok",
-            BaseUrl = $"{normalizedEndpoint}/openai/v1",
+            BaseUrl = EnterpriseAuth.NormalizeOpenAIBaseUrl(normalizedEndpoint),
             Model = deployment.ModelName,
             Deployment = deployment.DeploymentName,
             ProviderType = "azure",
             Authentication = new ProfileAuthentication
             {
                 Type = "entra",
-                Resource = "https://cognitiveservices.azure.com",
+                Resource = EnterpriseAuth.DefaultResource,
                 Tenant = tenant
             },
             MaxOutputTokens = maxOutputTokens,

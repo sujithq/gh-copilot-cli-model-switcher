@@ -34,7 +34,7 @@ internal static class EnterpriseAuth
         if (IsEntra(profile) && arguments.Any(arg =>
             arg.Equals("--config-dir", StringComparison.OrdinalIgnoreCase) ||
             arg.StartsWith("--config-dir=", StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException("Entra launches do not allow --config-dir because it can bypass the provider registry guard. Use COPILOT_HOME or COPILOT_PROVIDERS_CONFIG so the launcher can validate the selected registry.");
+            throw new InvalidOperationException("Entra launches do not allow --config-dir because it can bypass the provider registry guard. Use a dedicated COPILOT_HOME without providers.json and unset COPILOT_PROVIDERS_CONFIG.");
     }
 
     internal static void Validate(Profile profile)
@@ -47,18 +47,19 @@ internal static class EnterpriseAuth
             throw new InvalidOperationException("Authentication type must be entra or apiKey.");
         if (profile.Type is not ("byok" or "proxy"))
             throw new InvalidOperationException("Explicit authentication requires a byok or proxy profile.");
-        ValidateHttps(profile.BaseUrl);
         if (auth.Tenant != null && !Guid.TryParseExact(auth.Tenant, "D", out _))
             throw new InvalidOperationException("Authentication tenant must be a tenant UUID.");
         if (auth.Resource != null) ValidateHttps(auth.Resource);
         if (auth.Type == "entra")
         {
+            ValidateHttps(profile.BaseUrl);
             if (profile.ApiKey != null || profile.ApiKeyEnv != null ||
                 profile.AzureCliToken != null || profile.TokenScope != null ||
                 profile.ExtraFields?.Count > 0)
                 throw new InvalidOperationException("Entra profiles accept configuration only: remove stored credentials, unknown fields, and legacy authentication settings.");
             if (string.IsNullOrWhiteSpace(profile.Model))
                 throw new InvalidOperationException("Entra profiles require a model.");
+            if (auth.Preflight) _ = PreflightEndpoint(profile);
         }
     }
 
@@ -92,35 +93,26 @@ internal static class EnterpriseAuth
 
     internal static void GuardRegistry(IDictionary<string, string?> environment, string home)
     {
-        environment.TryGetValue("COPILOT_PROVIDERS_CONFIG", out var configured);
-        environment.TryGetValue("COPILOT_HOME", out var copilotHome);
-        var path = !string.IsNullOrWhiteSpace(configured) ? configured :
-            Path.Combine(string.IsNullOrWhiteSpace(copilotHome) ? Path.Combine(home, ".copilot") : copilotHome, "providers.json");
         try
         {
-            string text;
-            try { text = File.ReadAllText(path); }
-            catch (FileNotFoundException) { if (string.IsNullOrWhiteSpace(configured)) return; else throw; }
-            catch (DirectoryNotFoundException) { if (string.IsNullOrWhiteSpace(configured)) return; else throw; }
-            using var doc = JsonDocument.Parse(text);
-            if (doc.RootElement.ValueKind != JsonValueKind.Object) throw new InvalidOperationException();
-            foreach (var property in doc.RootElement.EnumerateObject())
-            {
-                if (property.Name is not ("providers" or "models")) throw new InvalidOperationException();
-                var value = property.Value;
-                if (value.ValueKind == JsonValueKind.Object && !value.EnumerateObject().Any()) continue;
-                if (value.ValueKind == JsonValueKind.Array && value.GetArrayLength() == 0) continue;
-                throw new InvalidOperationException();
-            }
+            if (environment.ContainsKey("COPILOT_PROVIDERS_CONFIG")) throw new InvalidOperationException();
+            environment.TryGetValue("COPILOT_HOME", out var copilotHome);
+            var path = Path.Combine(string.IsNullOrWhiteSpace(copilotHome) ? Path.Combine(home, ".copilot") : copilotHome, "providers.json");
+            try { _ = File.GetAttributes(path); }
+            catch (FileNotFoundException) { return; }
+            catch (DirectoryNotFoundException) { return; }
+            throw new InvalidOperationException();
         }
         catch
         {
-            throw new InvalidOperationException("Provider registry takes precedence over launcher authentication. Use a separate valid empty registry ({\"providers\":[]}) via COPILOT_PROVIDERS_CONFIG. Existing files were not modified.");
+            throw new InvalidOperationException("Provider registries can take precedence over launcher authentication. This Entra guard is stricter than Copilot CLI: all existing registries and COPILOT_PROVIDERS_CONFIG overrides are blocked. Use a dedicated COPILOT_HOME without providers.json and unset COPILOT_PROVIDERS_CONFIG. No files were modified.");
         }
     }
 
     internal static async Task<AzureResult> RunAzure(IReadOnlyList<string> arguments)
     {
+        if (arguments.Count > 0 && arguments[0] == "login")
+            return await RunAzureLogin(arguments);
         try
         {
             var info = AzureStartInfo(arguments, OperatingSystem.IsWindows());
@@ -136,11 +128,31 @@ internal static class EnterpriseAuth
         }
     }
 
-    internal static ProcessStartInfo AzureStartInfo(IReadOnlyList<string> arguments, bool windows)
+    private static async Task<AzureResult> RunAzureLogin(IReadOnlyList<string> arguments)
     {
+        try
+        {
+            using var process = Process.Start(AzureStartInfo(arguments, OperatingSystem.IsWindows(), interactiveLogin: true))
+                ?? throw new InvalidOperationException();
+            await process.WaitForExitAsync();
+            return new AzureResult(process.ExitCode, "");
+        }
+        catch
+        {
+            throw new InvalidOperationException("Unable to run interactive Azure sign-in. Run az login manually, then restart.");
+        }
+    }
+
+    internal static ProcessStartInfo AzureStartInfo(IReadOnlyList<string> arguments, bool windows, bool interactiveLogin = false)
+    {
+        if (interactiveLogin && (arguments.Count == 0 || arguments[0] != "login"))
+            throw new InvalidOperationException("Only Azure login may use interactive output.");
         var info = new ProcessStartInfo(windows ? "cmd.exe" : "az")
         {
-            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true
+            UseShellExecute = false,
+            RedirectStandardInput = false,
+            RedirectStandardOutput = !interactiveLogin,
+            RedirectStandardError = !interactiveLogin
         };
         if (windows)
         {
@@ -259,12 +271,21 @@ internal static class EnterpriseAuth
         return profile.Model ?? "";
     }
 
+    internal static string NormalizeOpenAIBaseUrl(string? baseUrl)
+    {
+        var uri = ValidateHttps(baseUrl);
+        var path = uri.AbsolutePath.TrimEnd('/');
+        if (path.Contains("/openai/deployments/", StringComparison.OrdinalIgnoreCase)) path = "/openai/v1";
+        else if (!path.EndsWith("/openai/v1", StringComparison.OrdinalIgnoreCase)) path += "/openai/v1";
+        return uri.GetLeftPart(UriPartial.Authority) + path;
+    }
+
     internal static Uri PreflightEndpoint(Profile profile)
     {
         var uri = ValidateHttps(profile.BaseUrl);
         var path = uri.AbsolutePath.TrimEnd('/');
-        if (path.Contains("/openai/deployments/", StringComparison.OrdinalIgnoreCase)) path = "/openai/v1";
-        else if (!path.EndsWith("/openai/v1", StringComparison.OrdinalIgnoreCase)) path += "/openai/v1";
+        if (!path.EndsWith("/openai/v1", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Preflight requires a chat-compatible /openai/v1 base URL. It will not probe another API surface; disable preflight or configure the correct endpoint.");
         return new Uri(uri.GetLeftPart(UriPartial.Authority) + path + "/chat/completions");
     }
 

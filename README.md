@@ -67,6 +67,7 @@ This is **switcher JSON**, not a Copilot `providers.json` schema. Replace the en
 - `authentication.type: "entra"` enables the new launch flow; `"apiKey"` explicitly selects the existing `apiKeyEnv` / `apiKey` workflow.
 - `resource` defaults to `https://ai.azure.com`, as in Microsoft's Foundry/OpenAI-v1 examples. Use `https://cognitiveservices.azure.com` for API surfaces requiring the Cognitive Services audience (including documented dated Azure OpenAI examples). **Do not infer audience from the hostname alone**: Foundry's v1 examples also use `openai.azure.com` hosts. Legacy `tokenScope` behavior is unchanged.
 - Do not put API keys or bearer tokens in an Entra profile. Conflicting credentials and unknown authentication properties are rejected.
+- When migrating an existing profile to explicit Entra authentication, remove `azureCliToken`, `tokenScope`, `apiKey`, and `apiKeyEnv`; configure the audience under `authentication.resource` instead.
 - Entra endpoints must use HTTPS. Only use trusted endpoints: the configured endpoint receives your bearer token.
 - Newly imported .NET Foundry profiles use explicit Entra authentication, an OpenAI-v1 endpoint, and the Foundry audience. Override the audience if required by your deployment's API guidance.
 
