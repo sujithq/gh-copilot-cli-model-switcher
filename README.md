@@ -79,6 +79,8 @@ gh-copilot-byok use foundry-enterprise
 
 The launcher checks the Azure account and tenant, requests a token with expiration metadata, and refuses missing, malformed, expired, or near-expiry tokens (less than five minutes remaining). Interactive launches can offer Azure login when no session is available; non-interactive launches fail with login guidance instead.
 
+This initial flow targets Azure CLI developer/user or service-principal sessions, not a general Azure Identity credential chain. Azure CLI's token `--tenant` option is not supported for managed-identity or Cloud Shell accounts; managed/workload identity provisioning is outside this launcher.
+
 Provider variables are built in a separate child environment. Inherited provider credentials, API-key commands, model settings, and token limits are cleared before applying the selected profile. The launcher does not export the token into your shell, persist it in configuration, or include it in diagnostic output.
 
 ### Registry precedence

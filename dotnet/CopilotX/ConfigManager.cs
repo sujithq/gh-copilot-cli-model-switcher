@@ -130,11 +130,10 @@ public class ConfigManager
     {
         try
         {
-            // Read only CLI account metadata, not token caches; registry checks must precede az.
-            var azureDir = Environment.GetEnvironmentVariable("AZURE_CONFIG_DIR");
-            if (string.IsNullOrWhiteSpace(azureDir))
-                azureDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".azure");
-            using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(azureDir, "azureProfile.json")).TrimStart('\uFEFF'));
+            var response = EnterpriseAuth.RunAzure(["account", "show", "--output", "json"]).GetAwaiter().GetResult();
+            if (response.ExitCode != 0 || string.IsNullOrWhiteSpace(response.Output))
+                return null;
+            using var doc = JsonDocument.Parse(response.Output);
             return ReadAzureIdentity(doc.RootElement);
         }
         catch
@@ -145,22 +144,17 @@ public class ConfigManager
 
     internal static string? ReadAzureIdentity(JsonElement root)
     {
-        if (!root.TryGetProperty("subscriptions", out var accounts) || accounts.ValueKind != JsonValueKind.Array)
+        if (root.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty("tenantId", out var tenant) || tenant.ValueKind != JsonValueKind.String ||
+            !root.TryGetProperty("user", out var user) || user.ValueKind != JsonValueKind.Object ||
+            !user.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String)
             return null;
-        foreach (var account in accounts.EnumerateArray())
-        {
-            if (!account.TryGetProperty("isDefault", out var isDefault) || isDefault.ValueKind != JsonValueKind.True)
-                continue;
-            if (!account.TryGetProperty("tenantId", out var tenant) || tenant.ValueKind != JsonValueKind.String ||
-                !account.TryGetProperty("user", out var user) || user.ValueKind != JsonValueKind.Object ||
-                !user.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String)
-                return null;
-            if (string.IsNullOrWhiteSpace(tenant.GetString()) || string.IsNullOrWhiteSpace(name.GetString()))
-                return null;
-            return $"{SanitizeSegment(tenant.GetString()!)}__{SanitizeSegment(name.GetString()!)}";
-        }
-        return null;
+        if (string.IsNullOrWhiteSpace(tenant.GetString()) || string.IsNullOrWhiteSpace(name.GetString()))
+            return null;
+        return $"{SanitizeSegment(tenant.GetString()!)}__{SanitizeSegment(name.GetString()!)}";
     }
+
+    internal static Func<string?> AzureIdentityResolver { get; set; } = GetAzureIdentityKey;
 
     private static readonly AsyncLocal<string?> PinnedConfigFile = new();
 
@@ -201,7 +195,7 @@ public class ConfigManager
         var scope = (Environment.GetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE")
             ?? Environment.GetEnvironmentVariable("COPILOTX_CONFIG_SCOPE")
             ?? "auto").ToLowerInvariant();
-        var identityKey = scope == "global" ? null : GetAzureIdentityKey();
+        var identityKey = scope == "global" ? null : AzureIdentityResolver();
         return ResolveConfigFileFor(configDir, scope, identityKey);
     }
 

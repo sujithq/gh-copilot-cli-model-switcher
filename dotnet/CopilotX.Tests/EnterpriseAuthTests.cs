@@ -237,6 +237,16 @@ public sealed class EnterpriseAuthTests : IDisposable
     }
 
     [Fact]
+    public void Token_LaunchCheckRejectsExpiryAfterInteractiveDelay()
+    {
+        var token = EnterpriseAuth.ParseToken(TokenJson(), Tenant, Now);
+        EnterpriseAuth.EnsureTokenLifetime(token.ExpiresAt, Now.AddMinutes(50));
+        var error = Assert.Throws<InvalidOperationException>(() => EnterpriseAuth.EnsureTokenLifetime(token.ExpiresAt, Now.AddMinutes(56)));
+        Assert.Contains("restart", error.Message);
+        Assert.DoesNotContain(Secret, error.Message);
+    }
+
+    [Fact]
     public void Registry_RejectsEveryExistingRegistryWithoutChangingFiles()
     {
         foreach (var content in new[] { "", "{}", "oops", "[]", """{"providers":[]}""", """{"providers":{},"models":[]}""",
@@ -336,20 +346,49 @@ public sealed class EnterpriseAuthTests : IDisposable
     }
 
     [Fact]
-    public async Task Environment_ApiKeysTakePrecedenceAndClearBearerAndCommand()
+    public async Task Environment_ExplicitApiKeyDisablesLegacyTokenModeAndClearsBearerAndCommand()
     {
-        foreach (var explicitAuth in new[] { false, true })
+        var profile = new Profile
         {
-            var profile = new Profile { Type = "byok", BaseUrl = "https://example.openai.azure.com", Model = "m", ApiKeyEnv = "KEY", AzureCliToken = "on" };
-            if (explicitAuth) profile.Authentication = new() { Type = "apiKey" };
-            var result = await CopilotX.Program.SetEnvironmentForProfile(profile, inherited: new Dictionary<string, string?>
+            Type = "byok", BaseUrl = "https://example.openai.azure.com", Model = "m", ApiKeyEnv = "KEY",
+            AzureCliToken = "on", Authentication = new() { Type = "apiKey" }
+        };
+        var result = await CopilotX.Program.SetEnvironmentForProfile(profile, inherited: new Dictionary<string, string?>
+        {
+            ["KEY"] = "configured-key", ["COPILOT_PROVIDER_BEARER_TOKEN"] = "stale",
+            ["COPILOT_PROVIDER_API_KEY_COMMAND"] = "command"
+        }, legacyToken: _ => throw new Exception("Must not acquire token"));
+        Assert.Equal("configured-key", result.Environment["COPILOT_PROVIDER_API_KEY"]);
+        Assert.False(result.Environment.ContainsKey("COPILOT_PROVIDER_BEARER_TOKEN"));
+        Assert.False(result.Environment.ContainsKey("COPILOT_PROVIDER_API_KEY_COMMAND"));
+    }
+
+    [Fact]
+    public async Task Environment_LegacyOnForcesTokenWhileAutoAndOffPreserveApiKey()
+    {
+        foreach (var mode in new[] { "on", "auto", "off" })
+        {
+            var profile = new Profile
             {
-                ["KEY"] = "configured-key", ["COPILOT_PROVIDER_BEARER_TOKEN"] = "stale",
-                ["COPILOT_PROVIDER_API_KEY_COMMAND"] = "command"
-            }, legacyToken: _ => throw new Exception("Must not acquire token"));
-            Assert.Equal("configured-key", result.Environment["COPILOT_PROVIDER_API_KEY"]);
-            Assert.False(result.Environment.ContainsKey("COPILOT_PROVIDER_BEARER_TOKEN"));
-            Assert.False(result.Environment.ContainsKey("COPILOT_PROVIDER_API_KEY_COMMAND"));
+                Type = "byok", BaseUrl = "https://example.openai.azure.com", Model = "m",
+                ApiKeyEnv = "KEY", AzureCliToken = mode
+            };
+            var calls = 0;
+            var result = await CopilotX.Program.SetEnvironmentForProfile(profile,
+                inherited: new Dictionary<string, string?> { ["KEY"] = "configured-key" },
+                legacyToken: _ => { calls++; return Task.FromResult("legacy-token"); });
+            Assert.Equal(mode == "on", result.UsedAzureCliToken);
+            Assert.Equal(mode == "on" ? 1 : 0, calls);
+            if (mode == "on")
+            {
+                Assert.Equal("legacy-token", result.Environment["COPILOT_PROVIDER_BEARER_TOKEN"]);
+                Assert.False(result.Environment.ContainsKey("COPILOT_PROVIDER_API_KEY"));
+            }
+            else
+            {
+                Assert.Equal("configured-key", result.Environment["COPILOT_PROVIDER_API_KEY"]);
+                Assert.False(result.Environment.ContainsKey("COPILOT_PROVIDER_BEARER_TOKEN"));
+            }
         }
     }
 

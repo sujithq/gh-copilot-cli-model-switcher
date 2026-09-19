@@ -249,14 +249,19 @@ internal static class EnterpriseAuth
                     TimeZoneInfo.Local.IsInvalidTime(local) || TimeZoneInfo.Local.IsAmbiguousTime(local)) throw new FormatException();
                 expiry = new DateTimeOffset(DateTime.SpecifyKind(local, DateTimeKind.Local));
             }
-            if (expiry - now < TimeSpan.FromMinutes(5))
-                throw new InvalidOperationException("Azure token expires in less than five minutes. Refresh with az login and restart.");
+            EnsureTokenLifetime(expiry, now);
             return new EntraToken(token!, expiry);
         }
         catch (Exception ex) when (ex is JsonException or FormatException or KeyNotFoundException or ArgumentException)
         {
             throw new InvalidOperationException("Azure CLI returned invalid token expiry or token metadata. Update az, sign in, and restart.");
         }
+    }
+
+    internal static void EnsureTokenLifetime(DateTimeOffset expiry, DateTimeOffset now)
+    {
+        if (expiry - now < TimeSpan.FromMinutes(5))
+            throw new InvalidOperationException("Azure token expires in less than five minutes. Refresh with az login and restart.");
     }
 
     internal static string WireModel(Profile profile)

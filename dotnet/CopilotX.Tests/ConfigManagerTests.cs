@@ -448,16 +448,13 @@ public class ConfigManagerTests : IDisposable
     }
 
     [Fact]
-    public void ConfigScope_ReadsOnlyDefaultCachedAccountWithoutAzureProcess()
+    public void ConfigScope_ReadsDocumentedAccountShowMetadata()
     {
         using var doc = JsonDocument.Parse("""
-        {"subscriptions":[
-          {"isDefault":false,"tenantId":"other","user":{"name":"other"}},
-          {"isDefault":true,"tenantId":"Tenant-ID","user":{"name":"User@Contoso.com"}}
-        ]}
+        {"tenantId":"Tenant-ID","user":{"name":"User@Contoso.com"}}
         """);
         Assert.Equal("tenant-id__user@contoso.com", ConfigManager.ReadAzureIdentity(doc.RootElement));
-        using var empty = JsonDocument.Parse("""{"subscriptions":[]}""");
+        using var empty = JsonDocument.Parse("{}");
         Assert.Null(ConfigManager.ReadAzureIdentity(empty.RootElement));
     }
 
@@ -480,10 +477,9 @@ public class ConfigManagerTests : IDisposable
     public async Task ConfigScope_InteractiveLoginCannotRedirectProfilePersistence()
     {
         const string tenant = "11111111-1111-1111-1111-111111111111";
-        var previousAzureDir = Environment.GetEnvironmentVariable("AZURE_CONFIG_DIR");
-        var azureDir = Path.Combine(_tempConfigDir, ".azure");
-        Directory.CreateDirectory(azureDir);
-        Environment.SetEnvironmentVariable("AZURE_CONFIG_DIR", azureDir);
+        var previousResolver = ConfigManager.AzureIdentityResolver;
+        string? currentIdentity = null;
+        ConfigManager.AzureIdentityResolver = () => currentIdentity;
         try
         {
             var profile = new Profile
@@ -504,10 +500,7 @@ public class ConfigManagerTests : IDisposable
                     if (calls == 1) return new AzureResult(1, "");
                     if (args[0] == "login")
                     {
-                        File.WriteAllText(Path.Combine(azureDir, "azureProfile.json"), JsonSerializer.Serialize(new
-                        {
-                            subscriptions = new[] { new { isDefault = true, tenantId = tenant, user = new { name = "signed-in@contoso.com" } } }
-                        }));
+                        currentIdentity = $"{tenant}__signed-in@contoso.com";
                         return new AzureResult(0, "");
                     }
                     if (args[1] == "show")
@@ -531,7 +524,7 @@ public class ConfigManagerTests : IDisposable
         }
         finally
         {
-            Environment.SetEnvironmentVariable("AZURE_CONFIG_DIR", previousAzureDir);
+            ConfigManager.AzureIdentityResolver = previousResolver;
             Environment.SetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE", "global");
         }
     }

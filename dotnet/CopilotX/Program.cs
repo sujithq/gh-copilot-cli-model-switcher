@@ -74,8 +74,8 @@ class Program
         table.AddRow("[cyan]manage[/]", "Interactive profile management (Use/Remove/Add/Import/MCP)");
         table.AddRow("[cyan]mcp-compat <profile> [[--action set|reset|all|none]][/]", "Set or reset MCP compatibility servers for an Azure BYOK/proxy profile");
         table.AddRow("[cyan]remove [[profiles...]][/]", "Remove one or more profiles (interactive multi-select)");
-        table.AddRow("[cyan]use <profile> [[args...]][/]", "Switch to a specific profile and run gh copilot");
-        table.AddRow("[cyan]last [[args...]][/]", "Use the last used profile and run gh copilot");
+        table.AddRow("[cyan]use <profile> [[args...]][/]", "Switch to a specific profile and run Copilot");
+        table.AddRow("[cyan]last [[args...]][/]", "Use the last used profile and run Copilot");
         table.AddRow("[cyan]default [[args...]][/]", "Use the default Copilot profile");
         table.AddRow("[cyan]add[/]", "Add or update a profile interactively");
         table.AddRow("[cyan]import-foundry [[options]][/]", "Import profiles from Foundry/Azure OpenAI deployments");
@@ -83,7 +83,7 @@ class Program
 
         AnsiConsole.Write(table);
 
-        AnsiConsole.MarkupLine("\n[bold]Passthrough flags[/] [dim](forwarded to gh copilot, applies to use / last / default):[/]");
+        AnsiConsole.MarkupLine("\n[bold]Passthrough flags[/] [dim](forwarded to Copilot, applies to use / last / default):[/]");
         var flagTable = new Table();
         flagTable.AddColumn("Flag");
         flagTable.AddColumn("Description");
@@ -517,22 +517,11 @@ class Program
         }
 
         EnterpriseAuth.ValidateLaunchArguments(profile, copilotArgs);
+        EnterpriseAuth.Validate(profile);
+        if (EnterpriseAuth.IsEntra(profile))
+            EnterpriseAuth.GuardRegistry(EnterpriseAuth.CopyEnvironment(), Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         AnsiConsole.MarkupLine($"[green]Using profile:[/] {Markup.Escape(profile.Name)} ([dim]{Markup.Escape(profile.Type)}[/])");
         AnsiConsole.MarkupLine($"[dim]Token limits: {EscapeMarkup(FormatProfileTokenInfo(profile))}[/]");
-
-        AuthEnvironmentResult envInfo;
-        try
-        {
-            envInfo = await SetEnvironmentForProfile(profile, copilotArgs.Length == 0 && !Console.IsInputRedirected);
-        }
-        catch (Exception ex)
-        {
-            AnsiConsole.MarkupLine($"[red]Error setting auth environment: {EscapeMarkup(ex.Message)}[/]");
-            AnsiConsole.MarkupLine("[dim]For Azure CLI token auth, ensure az is installed and you are logged in: az login[/]");
-            return 1;
-        }
-
-        ConfigManager.SetLastUsed(profileName);
 
         var userRequestedInteractive = copilotArgs.Length == 0;
 
@@ -556,6 +545,22 @@ class Program
         }
 
         var effectiveCopilotArgs = BuildCopilotArgs(profile, copilotArgs);
+
+        AuthEnvironmentResult envInfo;
+        try
+        {
+            envInfo = await SetEnvironmentForProfile(profile, userRequestedInteractive && !Console.IsInputRedirected);
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Error setting auth environment: {EscapeMarkup(ex.Message)}[/]");
+            AnsiConsole.MarkupLine("[dim]For Azure CLI token auth, ensure az is installed and you are logged in: az login[/]");
+            return 1;
+        }
+
+        ConfigManager.SetLastUsed(profileName);
+        if (envInfo.ExpiresAt is { } expiry)
+            EnterpriseAuth.EnsureTokenLifetime(expiry, DateTimeOffset.UtcNow);
 
         try
         {
@@ -779,7 +784,7 @@ class Program
 
     static bool ShouldUseAzureCliToken(Profile profile, bool hasApiKey)
     {
-        if (hasApiKey || profile.Authentication != null) return false;
+        if (profile.Authentication != null) return false;
         var mode = (profile.AzureCliToken ?? "auto").ToLowerInvariant();
 
         if (mode == "on")
@@ -961,6 +966,7 @@ class Program
                 EnterpriseAuth.GuardRegistry(inherited, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
                 var token = await EnterpriseAuth.Acquire(profile, interactive, runAzure ?? EnterpriseAuth.RunAzure, now ?? (() => DateTimeOffset.UtcNow));
                 environment["COPILOT_PROVIDER_BEARER_TOKEN"] = token.AccessToken;
+                result.ExpiresAt = token.ExpiresAt;
                 AnsiConsole.MarkupLine($"[dim]Entra token expires {EscapeMarkup(token.ExpiresAt.ToString("u"))}. Running child sessions cannot refresh; restart after expiry. Requests are never automatically replayed.[/]");
                 if (profile.Authentication!.Preflight)
                 {
@@ -1023,13 +1029,13 @@ class Program
             AnsiConsole.MarkupLine("[dim]If prompted to trust this folder, choose option 2 once to remember it.[/]");
             AnsiConsole.MarkupLine("");
 
-            // Interactive gh copilot expects a real terminal (TTY). Avoid redirected pipes here.
+            // Interactive Copilot expects a real terminal (TTY). Avoid redirected pipes here.
             var interactiveStartInfo = EnterpriseAuth.ChildStartInfo(profile, copilotArgs, environment, true);
 
             var interactiveProcess = Process.Start(interactiveStartInfo);
             if (interactiveProcess == null)
             {
-                throw new InvalidOperationException("Failed to start gh copilot.");
+                throw new InvalidOperationException("Failed to start Copilot.");
             }
 
             await interactiveProcess.WaitForExitAsync();
@@ -1046,7 +1052,7 @@ class Program
         var process = Process.Start(startInfo);
         if (process == null)
         {
-            throw new InvalidOperationException("Failed to start gh copilot.");
+            throw new InvalidOperationException("Failed to start Copilot.");
         }
 
         _ = Task.Run(async () =>
@@ -1597,6 +1603,7 @@ class Program
     internal class AuthEnvironmentResult
     {
         public bool UsedAzureCliToken { get; set; }
+        public DateTimeOffset? ExpiresAt { get; set; }
         public Dictionary<string, string?> Environment { get; set; } = new();
     }
 
