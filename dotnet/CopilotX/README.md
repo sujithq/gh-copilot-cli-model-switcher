@@ -1,6 +1,6 @@
 # copilot-byok-model-switcher - .NET Tool
 
-A lightweight .NET CLI tool wrapper around GitHub Copilot CLI for easy model switching between default Copilot and custom BYOK models.
+A .NET enterprise BYOK launcher for GitHub Copilot CLI, with model profiles and just-in-time Microsoft Entra authentication.
 
 Built with [Spectre.Console](https://spectreconsole.net/) for a beautiful CLI experience.
 
@@ -54,7 +54,47 @@ Full release instructions: [../../RELEASING.md](../../RELEASING.md)
 ## Prerequisites
 
 - .NET 10 SDK or higher
-- GitHub Copilot CLI installed: `gh extension install github/gh-copilot`
+- Current standalone GitHub Copilot CLI (`copilot`) for explicit Entra profiles. Existing profiles retain the `gh copilot` launch path.
+- Azure CLI (`az`) for Entra profiles, with an authenticated account and resource-scoped inference RBAC.
+
+## Enterprise authentication in 2.4.0
+
+Use `gh-copilot-byok add` to select Entra authentication. Profiles contain configuration, not credentials:
+
+```json
+{
+  "name": "azure-enterprise",
+  "type": "byok",
+  "providerType": "azure",
+  "baseUrl": "https://your-resource.openai.azure.com/openai/v1",
+  "model": "gpt-4.1",
+  "deployment": "my-deployment",
+  "authentication": {
+    "type": "entra",
+    "tenant": "00000000-0000-0000-0000-000000000000",
+    "resource": "https://ai.azure.com",
+    "preflight": false
+  }
+}
+```
+
+Replace the endpoint, model, deployment, and tenant ID. Tenant is optional but recommended. The default resource is `https://ai.azure.com` for Foundry/OpenAI-v1 examples; override with `https://cognitiveservices.azure.com` for API surfaces requiring that audience. Do not choose by hostname alone. This is the switcher's JSON schema, **not** `providers.json`.
+
+```bash
+az login --tenant "<tenant-id>"
+gh-copilot-byok use azure-enterprise
+```
+
+- Validates the Azure account, optional tenant, and token expiry (at least five minutes remaining). Non-interactive launches never initiate login.
+- Stores no API key or bearer token in an Entra profile. Unknown authentication properties and conflicting credentials are rejected.
+- Builds a dedicated child environment, clearing inherited provider credentials and model settings. Runs standalone `copilot` for explicit Entra profiles.
+- Conservatively blocks any existing provider registry or explicit `COPILOT_PROVIDERS_CONFIG` before acquiring credentials, since empty-registry semantics are undocumented. Keep your native registry intact; use a dedicated `COPILOT_HOME` with no registry and unset `COPILOT_PROVIDERS_CONFIG`. Passthrough `--config-dir` is rejected for Entra launches.
+- Optional `preflight: true` sends a minimal **potentially billable** Azure OpenAI-compatible chat-completions request; it does not change RBAC. `401` indicates authentication trouble; `403` may reflect RBAC, PIM, or network restrictions.
+- Displays expiry but does **not** refresh tokens in a running process or automatically replay a failed Entra session. Restart through the launcher when needed. Azure CLI may reuse cached tokens and maintains its own login cache.
+
+`authentication.type: "apiKey"` explicitly selects existing API-key behavior. Profiles without `authentication` retain legacy `azureCliToken` / `tokenScope` handling.
+
+These features are **.NET-only**; the Node.js implementation is unchanged. Full guidance, security boundaries, and official sources: [Enterprise authentication](https://github.com/sujithq/gh-copilot-cli-model-switcher#enterprise-authentication-net-240).
 
 ## Usage
 
@@ -120,9 +160,9 @@ gh-copilot-byok mcp-compat foundry-myaccount-gpt-4-1 --action none
 gh-copilot-byok use <profile> [copilot-args..]
 ```
 
-Switch to a profile and run GitHub Copilot CLI with that configuration. Without extra arguments, launches `gh copilot` in interactive mode.
+Switch to a profile and run GitHub Copilot CLI with that configuration. Without extra arguments, launches interactively: `copilot` for explicit Entra profiles, `gh copilot` for legacy profiles.
 
-All arguments after the profile name are forwarded directly to `gh copilot`.
+All arguments after the profile name are forwarded to the selected Copilot executable.
 
 **Examples:**
 
@@ -355,6 +395,8 @@ Uses the standard GitHub Copilot service without custom configuration.
 Fields:
 - `baseUrl`: API endpoint URL
 - `model`: Model name
+- `deployment`: Optional wire deployment name; sent separately from the logical model ID
+- `authentication`: Optional explicit `entra` or `apiKey` configuration (see enterprise section)
 - `apiKeyEnv`: Environment variable containing the API key
 - `apiKey`: Direct API key (alternative to `apiKeyEnv`, less secure)
 - `providerType`: Optional provider type
@@ -370,7 +412,7 @@ Same as `byok`, useful for enterprise scenarios with API Management or token-bas
 
 ## How It Works
 
-The tool sets environment variables before launching `gh copilot`:
+The tool constructs a dedicated child environment before launching Copilot; it does not run `export` in your shell. These commands illustrate the equivalent legacy provider settings:
 
 **Default Copilot Mode:**
 ```bash
@@ -435,7 +477,7 @@ gh-copilot-byok use myprofile -p "fix the tests" --deny-tool=run_command
 ```
 
 Retry behavior:
-- If `gh copilot` fails with token/auth-related errors, gh-copilot-byok refreshes the token and retries once.
+- Legacy token profiles retain the one-time retry on token/auth-related errors. Explicit Entra profiles do not automatically replay the session.
 
 ## Enterprise Scenarios
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.4.0 (Unreleased)
+
+### Features
+
+* **.NET only:** Evolve the tool into an enterprise BYOK launcher with explicit `authentication` profiles and separate logical model / wire deployment settings.
+* Acquire Microsoft Entra bearer tokens through Azure CLI, validate tenant and expiry, and launch standalone Copilot with a dedicated child environment.
+* Detect native provider registry conflicts before authentication and add opt-in, potentially billable inference preflight with authentication/authorization diagnostics.
+* Expose Entra configuration in profile creation, listing, and Foundry import; preserve legacy API-key and token profiles.
+
+### Security and limitations
+
+* Reject credentials in Entra profiles and avoid logging or persisting acquired tokens.
+* Clear inherited provider authentication commands, credentials, and model settings in the .NET child environment.
+* Acquire tokens per launch; no transparent renewal, background expiry monitoring, or automatic replay of explicit Entra sessions.
+* Document endpoint-specific token audiences, Azure CLI credential caching, RBAC/network diagnostics, and registry precedence.
+* Node.js remains unchanged.
+
 ## [2.3.0](https://github.com/sujithq/gh-copilot-cli-model-switcher/compare/copilot-byok-model-switcher-v2.2.0...copilot-byok-model-switcher-v2.3.0) (2026-05-04)
 
 

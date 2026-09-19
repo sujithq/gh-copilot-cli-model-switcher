@@ -6,7 +6,22 @@
 2. **Flexibility**: Support multiple models and providers
 3. **Persistence**: Remember last used configuration
 4. **Enterprise-ready**: Support for Azure, RBAC, proxy scenarios
-5. **Feature Parity**: Both Node.js and .NET implementations provide identical functionality
+5. **Compatibility**: Both implementations support legacy profiles; enterprise authentication in 2.4.0 is .NET-only
+
+## .NET enterprise launch flow (2.4.0)
+
+Explicit `authentication.type: "entra"` profiles follow this flow:
+
+1. Validate the credential-free profile and active provider registry; fail closed on registry conflicts.
+2. Check the Azure CLI account, optionally log in interactively, and validate the configured tenant.
+3. Obtain an access token and expiry metadata for the configured resource audience.
+4. Reject malformed, expired, or near-expiry tokens; optionally run a billable inference preflight.
+5. Build a separate child environment with the bearer token, logical model, and wire deployment.
+6. Launch standalone `copilot` without automatic replay or background token renewal.
+
+API-key and legacy token profiles retain their prior authentication selection and `gh copilot` executable. Their provider settings now also use child-only environments in .NET. Azure CLI owns its authentication cache; the launcher never stores acquired bearer tokens. See the [enterprise guide](README.md#enterprise-authentication-net-240) for registry precedence, token audiences, and security boundaries.
+
+The diagrams and examples below describe the original shared legacy flow.
 
 ## 🏗️ System Architecture
 

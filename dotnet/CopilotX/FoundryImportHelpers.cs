@@ -347,7 +347,8 @@ internal static class FoundryImportHelpers
         FoundryDeployment deployment,
         IEnumerable<string> existingNames,
         int? maxOutputTokens = null,
-        int? maxPromptTokens = null)
+        int? maxPromptTokens = null,
+        string? tenant = null)
     {
         var normalizedEndpoint = (string.IsNullOrWhiteSpace(endpoint)
             ? $"https://{accountName}.openai.azure.com"
@@ -357,12 +358,16 @@ internal static class FoundryImportHelpers
         {
             Name = BuildUniqueProfileName(accountName, deployment.DeploymentName, existingNames),
             Type = "byok",
-            BaseUrl = $"{normalizedEndpoint}/openai/deployments/{deployment.DeploymentName}",
-            // For Azure OpenAI BYOK, COPILOT_MODEL must match deployment name.
-            Model = deployment.DeploymentName,
+            BaseUrl = $"{normalizedEndpoint}/openai/v1",
+            Model = deployment.ModelName,
+            Deployment = deployment.DeploymentName,
             ProviderType = "azure",
-            AzureCliToken = "auto",
-            TokenScope = "https://cognitiveservices.azure.com/.default",
+            Authentication = new ProfileAuthentication
+            {
+                Type = "entra",
+                Resource = "https://cognitiveservices.azure.com",
+                Tenant = tenant
+            },
             MaxOutputTokens = maxOutputTokens,
             MaxPromptTokens = maxPromptTokens
         };

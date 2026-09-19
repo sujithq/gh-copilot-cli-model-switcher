@@ -1,11 +1,19 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Diagnostics;
 
 namespace CopilotX;
 
 public class Profile
 {
+    [JsonPropertyName("deployment")]
+    public string? Deployment { get; set; }
+
+    [JsonPropertyName("authentication")]
+    public ProfileAuthentication? Authentication { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtraFields { get; set; }
+
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
@@ -103,11 +111,6 @@ public class ConfigManager
         return DefaultConfigDir;
     }
 
-    private static string GetAzureCliCommand()
-    {
-        return OperatingSystem.IsWindows() ? "az.cmd" : "az";
-    }
-
     private static string SanitizeSegment(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -127,57 +130,50 @@ public class ConfigManager
     {
         try
         {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = GetAzureCliCommand(),
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = false
-            };
-
-            startInfo.ArgumentList.Add("account");
-            startInfo.ArgumentList.Add("show");
-            startInfo.ArgumentList.Add("-o");
-            startInfo.ArgumentList.Add("json");
-
-            var process = Process.Start(startInfo);
-            if (process == null)
-            {
-                return null;
-            }
-
-            var stdout = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-
-            if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(stdout))
-            {
-                return null;
-            }
-
-            using var doc = JsonDocument.Parse(stdout);
-            var root = doc.RootElement;
-
-            var tenantId = root.TryGetProperty("tenantId", out var tenantProp)
-                ? SanitizeSegment(tenantProp.GetString() ?? string.Empty)
-                : string.Empty;
-
-            var userName = string.Empty;
-            if (root.TryGetProperty("user", out var userObj) && userObj.TryGetProperty("name", out var nameProp))
-            {
-                userName = SanitizeSegment(nameProp.GetString() ?? string.Empty);
-            }
-
-            if (string.IsNullOrWhiteSpace(tenantId) || string.IsNullOrWhiteSpace(userName))
-            {
-                return null;
-            }
-
-            return $"{tenantId}__{userName}";
+            // Read only CLI account metadata, not token caches; registry checks must precede az.
+            var azureDir = Environment.GetEnvironmentVariable("AZURE_CONFIG_DIR");
+            if (string.IsNullOrWhiteSpace(azureDir))
+                azureDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".azure");
+            using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(azureDir, "azureProfile.json")).TrimStart('\uFEFF'));
+            return ReadAzureIdentity(doc.RootElement);
         }
         catch
         {
             return null;
         }
+    }
+
+    internal static string? ReadAzureIdentity(JsonElement root)
+    {
+        if (!root.TryGetProperty("subscriptions", out var accounts) || accounts.ValueKind != JsonValueKind.Array)
+            return null;
+        foreach (var account in accounts.EnumerateArray())
+        {
+            if (!account.TryGetProperty("isDefault", out var isDefault) || isDefault.ValueKind != JsonValueKind.True)
+                continue;
+            if (!account.TryGetProperty("tenantId", out var tenant) || tenant.ValueKind != JsonValueKind.String ||
+                !account.TryGetProperty("user", out var user) || user.ValueKind != JsonValueKind.Object ||
+                !user.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String)
+                return null;
+            if (string.IsNullOrWhiteSpace(tenant.GetString()) || string.IsNullOrWhiteSpace(name.GetString()))
+                return null;
+            return $"{SanitizeSegment(tenant.GetString()!)}__{SanitizeSegment(name.GetString()!)}";
+        }
+        return null;
+    }
+
+    private static readonly AsyncLocal<string?> PinnedConfigFile = new();
+
+    internal static IDisposable PinConfiguration()
+    {
+        var previous = PinnedConfigFile.Value;
+        PinnedConfigFile.Value = ResolveConfigFile();
+        return new ConfigFileScope(previous);
+    }
+
+    private sealed class ConfigFileScope(string? previous) : IDisposable
+    {
+        public void Dispose() => PinnedConfigFile.Value = previous;
     }
 
     internal static string ResolveConfigFileFor(string configDir, string scope, string? identityKey)
@@ -200,11 +196,12 @@ public class ConfigManager
 
     private static string ResolveConfigFile()
     {
+        if (PinnedConfigFile.Value is { } pinned) return pinned;
         var configDir = GetConfigDir();
         var scope = (Environment.GetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE")
             ?? Environment.GetEnvironmentVariable("COPILOTX_CONFIG_SCOPE")
             ?? "auto").ToLowerInvariant();
-        var identityKey = GetAzureIdentityKey();
+        var identityKey = scope == "global" ? null : GetAzureIdentityKey();
         return ResolveConfigFileFor(configDir, scope, identityKey);
     }
 
@@ -252,17 +249,20 @@ public class ConfigManager
         try
         {
             var json = File.ReadAllText(configFile);
-            return JsonSerializer.Deserialize<Config>(json, JsonOptions) ?? JsonSerializer.Deserialize<Config>(JsonSerializer.Serialize(DefaultConfig, JsonOptions), JsonOptions)!;
+            var config = JsonSerializer.Deserialize<Config>(json, JsonOptions)
+                ?? throw new InvalidOperationException("Invalid configuration.");
+            foreach (var profile in config.Profiles) EnterpriseAuth.Validate(profile);
+            return config;
         }
-        catch (Exception ex)
+        catch
         {
-            Console.Error.WriteLine($"Error loading config: {ex.Message}");
-            return JsonSerializer.Deserialize<Config>(JsonSerializer.Serialize(DefaultConfig, JsonOptions), JsonOptions)!;
+            throw new InvalidOperationException("Invalid profile configuration. Check authentication settings; credentials must not be stored in Entra profiles.");
         }
     }
 
     public static bool SaveConfig(Config config)
     {
+        foreach (var profile in config.Profiles) EnterpriseAuth.Validate(profile);
         EnsureConfigDir();
 
         var configFile = ResolveConfigFile();
@@ -318,6 +318,8 @@ public class ConfigManager
             providerType = Normalize(profile.ProviderType),
             azureCliToken = Normalize(profile.AzureCliToken),
             tokenScope = Normalize(profile.TokenScope),
+            deployment = NormalizeCaseSensitive(profile.Deployment),
+            authentication = profile.Authentication,
             maxOutputTokens = profile.MaxOutputTokens,
             maxPromptTokens = profile.MaxPromptTokens,
             mcpCompatServers = NormalizeMcpServers(profile)
@@ -328,6 +330,7 @@ public class ConfigManager
 
     public static ProfileUpsertResult UpsertProfile(Profile profile)
     {
+        EnterpriseAuth.Validate(profile);
         var config = LoadConfig();
         var incomingName = (profile.Name ?? string.Empty).Trim();
 
@@ -362,6 +365,9 @@ public class ConfigManager
                 ProviderType = profile.ProviderType,
                 AzureCliToken = profile.AzureCliToken,
                 TokenScope = profile.TokenScope,
+                Deployment = profile.Deployment,
+                Authentication = profile.Authentication,
+                ExtraFields = profile.ExtraFields,
                 MaxOutputTokens = profile.MaxOutputTokens,
                 MaxPromptTokens = profile.MaxPromptTokens,
                 McpCompatServers = profile.McpCompatServers
