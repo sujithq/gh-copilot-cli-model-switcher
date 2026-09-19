@@ -319,10 +319,38 @@ internal static class EnterpriseAuth
         }
     }
 
-    internal static ProcessStartInfo ChildStartInfo(Profile profile, string[] args, IDictionary<string, string?> environment, bool interactive)
+    private static (string Executable, string? Loader) ResolveWindowsCopilot(IDictionary<string, string?> environment)
+    {
+        var path = environment.FirstOrDefault(item => item.Key.Equals("PATH", StringComparison.OrdinalIgnoreCase)).Value ?? "";
+        var directories = path.Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(directory => directory.Trim().Trim('"'))
+            .Where(directory => directory.Length > 0)
+            .Select(Path.GetFullPath)
+            .ToArray();
+        string? Find(string name) => directories.Select(directory => Path.Combine(directory, name)).FirstOrDefault(File.Exists);
+
+        var native = Find("copilot.exe");
+        if (native != null) return (native, null);
+        var shim = Find("copilot.cmd");
+        if (shim != null)
+        {
+            var shimDirectory = Path.GetDirectoryName(shim)!;
+            var loader = Path.Combine(shimDirectory, "node_modules", "@github", "copilot", "npm-loader.js");
+            var adjacentNode = Path.Combine(shimDirectory, "node.exe");
+            var node = File.Exists(adjacentNode) ? adjacentNode : Find("node.exe");
+            if (File.Exists(loader) && node != null) return (node, loader);
+        }
+        throw new InvalidOperationException("Standalone Copilot was not found. Install the native copilot.exe on PATH, or install @github/copilot with npm and ensure its copilot.cmd, adjacent npm-loader.js, and node.exe are available.");
+    }
+
+    internal static ProcessStartInfo ChildStartInfo(Profile profile, string[] args, IDictionary<string, string?> environment, bool interactive, bool? windows = null)
     {
         var explicitEntra = IsEntra(profile);
-        var info = new ProcessStartInfo(explicitEntra ? "copilot" : "gh")
+        var executable = explicitEntra ? "copilot" : "gh";
+        string? loader = null;
+        if (explicitEntra && (windows ?? OperatingSystem.IsWindows()))
+            (executable, loader) = ResolveWindowsCopilot(environment);
+        var info = new ProcessStartInfo(executable)
         {
             UseShellExecute = false,
             RedirectStandardInput = !interactive,
@@ -331,6 +359,7 @@ internal static class EnterpriseAuth
         };
         info.Environment.Clear();
         foreach (var item in environment) info.Environment[item.Key] = item.Value;
+        if (loader != null) info.ArgumentList.Add(loader);
         if (!explicitEntra)
         {
             info.ArgumentList.Add("copilot");

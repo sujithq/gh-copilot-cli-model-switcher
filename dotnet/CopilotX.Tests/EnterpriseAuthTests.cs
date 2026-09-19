@@ -409,7 +409,7 @@ public sealed class EnterpriseAuthTests : IDisposable
         var profile = Profile();
         var env = new Dictionary<string, string?> { ["COPILOT_PROVIDER_BEARER_TOKEN"] = Secret, ["PATH"] = "keep" };
         var args = new[] { "-p", "create file" };
-        var info = EnterpriseAuth.ChildStartInfo(profile, args, env, false);
+        var info = EnterpriseAuth.ChildStartInfo(profile, args, env, false, windows: false);
         Assert.Equal("copilot", info.FileName);
         Assert.Equal(args, info.ArgumentList);
         Assert.Equal(Secret, info.Environment["COPILOT_PROVIDER_BEARER_TOKEN"]);
@@ -422,6 +422,62 @@ public sealed class EnterpriseAuthTests : IDisposable
         Assert.Equal("gh", legacyInfo.FileName);
         Assert.Equal(new[] { "copilot", "--", "-p", "create file" }, legacyInfo.ArgumentList);
         Assert.False(legacyInfo.RedirectStandardOutput);
+    }
+
+    [Fact]
+    public void Launch_WindowsPrefersNativeCopilotWithoutShell()
+    {
+        var nativeDirectory = Path.Combine(directory, "native");
+        Directory.CreateDirectory(nativeDirectory);
+        File.WriteAllText(Path.Combine(directory, "copilot.cmd"), "unused shim");
+        var executable = Path.Combine(nativeDirectory, "copilot.exe");
+        File.WriteAllText(executable, "");
+        var env = new Dictionary<string, string?> { ["PATH"] = directory + ";" + nativeDirectory };
+        var args = new[] { "-p", "literal & | % arguments" };
+        var info = EnterpriseAuth.ChildStartInfo(Profile(), args, env, false, windows: true);
+        Assert.Equal(executable, info.FileName);
+        Assert.Equal(args, info.ArgumentList);
+        Assert.False(info.UseShellExecute);
+    }
+
+    [Fact]
+    public void Launch_WindowsNpmUsesNodeLoaderAndLiteralArgumentList()
+    {
+        File.WriteAllText(Path.Combine(directory, "copilot.cmd"), "unused shim");
+        var packageDirectory = Path.Combine(directory, "node_modules", "@github", "copilot");
+        Directory.CreateDirectory(packageDirectory);
+        var loader = Path.Combine(packageDirectory, "npm-loader.js");
+        File.WriteAllText(loader, "");
+        var nodeDirectory = Path.Combine(directory, "node");
+        Directory.CreateDirectory(nodeDirectory);
+        var node = Path.Combine(nodeDirectory, "node.exe");
+        File.WriteAllText(node, "");
+        var env = new Dictionary<string, string?>
+        {
+            ["Path"] = directory + ";" + nodeDirectory,
+            ["COPILOT_PROVIDER_BEARER_TOKEN"] = Secret
+        };
+        var args = new[] { "-p", "literal \" & | %PROMPT% ! argument" };
+        var info = EnterpriseAuth.ChildStartInfo(Profile(), args, env, false, windows: true);
+        Assert.Equal(node, info.FileName);
+        Assert.Equal(new[] { loader }.Concat(args), info.ArgumentList);
+        Assert.Equal(Secret, info.Environment["COPILOT_PROVIDER_BEARER_TOKEN"]);
+        Assert.False(info.UseShellExecute);
+        info.Environment["COPILOT_PROVIDER_BEARER_TOKEN"] = "child-only";
+        Assert.Equal(Secret, env["COPILOT_PROVIDER_BEARER_TOKEN"]);
+    }
+
+    [Fact]
+    public void Launch_WindowsMissingNativeOrIncompleteNpmInstallFailsActionably()
+    {
+        var env = new Dictionary<string, string?> { ["PATH"] = directory };
+        var missing = Assert.Throws<InvalidOperationException>(() =>
+            EnterpriseAuth.ChildStartInfo(Profile(), [], env, false, windows: true));
+        Assert.Contains("copilot.exe", missing.Message);
+        Assert.Contains("node.exe", missing.Message);
+        File.WriteAllText(Path.Combine(directory, "copilot.cmd"), "unused shim");
+        Assert.Throws<InvalidOperationException>(() =>
+            EnterpriseAuth.ChildStartInfo(Profile(), [], env, false, windows: true));
     }
 
     [Fact]

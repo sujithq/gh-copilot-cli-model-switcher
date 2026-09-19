@@ -580,6 +580,8 @@ class Program
         catch
         {
             AnsiConsole.MarkupLine("[red]Unable to execute Copilot. Ensure the selected CLI is installed (standalone copilot for Entra; gh copilot for legacy profiles). No Entra request is replayed.[/]");
+            if (OperatingSystem.IsWindows() && EnterpriseAuth.IsEntra(profile))
+                AnsiConsole.MarkupLine("[dim]Windows requires native copilot.exe on PATH, or a complete npm @github/copilot installation with node.exe available.[/]");
             return 1;
         }
     }
