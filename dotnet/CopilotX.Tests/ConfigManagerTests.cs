@@ -12,7 +12,7 @@ public class ConfigManagerTests : IDisposable
 
     public ConfigManagerTests()
     {
-        _tempConfigDir = Path.Combine(Path.GetTempPath(), $"copilot-byok-model-switcher-dotnet-test-{Guid.NewGuid():N}");
+        _tempConfigDir = Path.Combine(Directory.GetCurrentDirectory(), $".copilot-byok-model-switcher-dotnet-test-{Guid.NewGuid():N}");
         _previousScope = Environment.GetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE");
         _previousConfigDir = Environment.GetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR");
 
@@ -110,6 +110,23 @@ public class ConfigManagerTests : IDisposable
         Assert.Equal("gpt-4o-prod", deployment.DeploymentName);
         Assert.Equal("gpt-4o-prod", deployment.ModelName);
         Assert.Equal(string.Empty, deployment.ModelVersion);
+    }
+
+    [Fact]
+    public void IsChatCapableDeployment_RejectsImageModelsEvenWhenResponsesCapabilityIsReported()
+    {
+        using var doc = JsonDocument.Parse("""
+        {
+            "name": "gpt-image-2",
+            "properties": {
+                "model": { "name": "gpt-image-2" },
+                "capabilities": { "responses": "true" }
+            }
+        }
+        """);
+
+        Assert.False(FoundryImportHelpers.IsChatCapableDeployment(doc.RootElement));
+        Assert.True(FoundryImportHelpers.IsKnownNonChatModel("gpt-image-2"));
     }
 
     [Fact]
@@ -246,11 +263,14 @@ public class ConfigManagerTests : IDisposable
 
         Assert.Equal("foundry-myfoundry-gpt-4o-prod", profile.Name);
         Assert.Equal("byok", profile.Type);
-        Assert.Equal("https://myfoundry.openai.azure.com/openai/deployments/gpt-4o-prod", profile.BaseUrl);
-        Assert.Equal("gpt-4o-prod", profile.Model);
+        Assert.Equal("https://myfoundry.openai.azure.com/openai/v1", profile.BaseUrl);
+        Assert.Equal("gpt-4o", profile.Model);
+        Assert.Equal("gpt-4o-prod", profile.Deployment);
         Assert.Equal("azure", profile.ProviderType);
-        Assert.Equal("auto", profile.AzureCliToken);
-        Assert.Equal("https://cognitiveservices.azure.com/.default", profile.TokenScope);
+        Assert.Null(profile.AzureCliToken);
+        Assert.Null(profile.TokenScope);
+        Assert.Equal("entra", profile.Authentication!.Type);
+        Assert.Equal("https://ai.azure.com", profile.Authentication.Resource);
         Assert.Null(profile.MaxOutputTokens);
         Assert.Null(profile.MaxPromptTokens);
     }
@@ -273,6 +293,21 @@ public class ConfigManagerTests : IDisposable
 
         Assert.Equal(4096, profile.MaxOutputTokens);
         Assert.Equal(64000, profile.MaxPromptTokens);
+    }
+
+    [Fact]
+    public void BuildImportedProfile_NormalizesOpenAIEndpointAndSeparatesDeployment()
+    {
+        foreach (var endpoint in new[] { "https://example.com/", "https://example.com/openai/v1/", "https://example.com/openai/deployments/production" })
+        {
+            var profile = FoundryImportHelpers.BuildImportedProfile("account", endpoint,
+                new FoundryDeployment { ModelName = "logical", DeploymentName = "production" }, []);
+            Assert.Equal("https://example.com/openai/v1", profile.BaseUrl);
+            Assert.Equal("logical", profile.Model);
+            Assert.Equal("production", profile.Deployment);
+            Assert.Equal("azure", profile.ProviderType);
+            Assert.Equal("https://ai.azure.com", profile.Authentication!.Resource);
+        }
     }
 
     [Fact]
@@ -349,30 +384,20 @@ public class ConfigManagerTests : IDisposable
     [Fact]
     public void SetProviderTokenLimitEnvironment_SetsAndClearsEnvVars()
     {
-        var previousMaxOutput = Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS");
-        var previousMaxPrompt = Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS");
-
-        try
-        {
+        var environment = new Dictionary<string, string?>();
             CopilotX.Program.SetProviderTokenLimitEnvironment(new Profile
             {
                 MaxOutputTokens = 8192,
                 MaxPromptTokens = 64000
-            });
+            }, environment);
 
-            Assert.Equal("8192", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS"));
-            Assert.Equal("64000", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS"));
+            Assert.Equal("8192", environment["COPILOT_PROVIDER_MAX_OUTPUT_TOKENS"]);
+            Assert.Equal("64000", environment["COPILOT_PROVIDER_MAX_PROMPT_TOKENS"]);
 
-            CopilotX.Program.SetProviderTokenLimitEnvironment(new Profile());
+            CopilotX.Program.SetProviderTokenLimitEnvironment(new Profile(), environment);
 
-            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS"));
-            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS"));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", previousMaxOutput);
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", previousMaxPrompt);
-        }
+            Assert.False(environment.ContainsKey("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS"));
+            Assert.False(environment.ContainsKey("COPILOT_PROVIDER_MAX_PROMPT_TOKENS"));
     }
 
     [Fact]
@@ -393,6 +418,132 @@ public class ConfigManagerTests : IDisposable
         });
 
         Assert.Equal("output=4096, prompt=64000", text);
+    }
+
+    [Fact]
+    public void Entra_SaveAndUpsertRejectSecretsBeforeWriting()
+    {
+        var profile = new Profile
+        {
+            Name = "enterprise", Type = "byok", BaseUrl = "https://example.com", Model = "m",
+            Authentication = new() { Type = "entra" }, ApiKey = "forbidden-stored-key"
+        };
+        Assert.Throws<InvalidOperationException>(() => ConfigManager.UpsertProfile(profile));
+        Assert.Throws<InvalidOperationException>(() => ConfigManager.SaveConfig(new Config { Profiles = [profile] }));
+        Assert.False(File.Exists(Path.Combine(_tempConfigDir, "config.json")));
+    }
+
+    [Fact]
+    public void Entra_PersistenceAndDedupIncludeAuthenticationAndDeployment()
+    {
+        Profile Make(string name, string deployment, string resource) => new()
+        {
+            Name = name, Type = "byok", BaseUrl = "https://example.com/openai/v1", Model = "logical",
+            Deployment = deployment, Authentication = new() { Type = "entra", Resource = resource, Preflight = true }
+        };
+        Assert.True(ConfigManager.AddProfile(Make("a", "prod", "https://ai.azure.com")));
+        Assert.Equal("added", ConfigManager.UpsertProfile(Make("b", "test", "https://ai.azure.com")).Action);
+        Assert.Equal("added", ConfigManager.UpsertProfile(Make("c", "prod", "https://cognitiveservices.azure.com")).Action);
+        Assert.Equal("updated-equivalent", ConfigManager.UpsertProfile(Make("d", "prod", "https://ai.azure.com")).Action);
+        var saved = ConfigManager.GetProfile("a")!;
+        Assert.Equal("prod", saved.Deployment);
+        Assert.Equal("entra", saved.Authentication!.Type);
+        Assert.True(saved.Authentication.Preflight);
+        Assert.Null(saved.ApiKey);
+        Assert.Null(saved.ApiKeyEnv);
+        Assert.Null(saved.AzureCliToken);
+    }
+
+    [Fact]
+    public void Entra_LoadFailsClosedForUnknownAuthenticationKeys()
+    {
+        ConfigManager.EnsureConfigDir();
+        File.WriteAllText(ConfigManager.GetConfigFile(),
+            """{"profiles":[{"name":"bad","type":"byok","model":"m","baseUrl":"https://example.com","authentication":{"type":"entra","token":"secret-do-not-log"}}]}""");
+        var error = Assert.Throws<InvalidOperationException>(() => ConfigManager.LoadConfig());
+        Assert.DoesNotContain("secret-do-not-log", error.Message);
+    }
+
+    [Fact]
+    public void ConfigScope_ReadsDocumentedAccountShowMetadata()
+    {
+        using var doc = JsonDocument.Parse("""
+        {"tenantId":"Tenant-ID","user":{"name":"User@Contoso.com"}}
+        """);
+        Assert.Equal("tenant-id__user@contoso.com", ConfigManager.ReadAzureIdentity(doc.RootElement));
+        using var empty = JsonDocument.Parse("{}");
+        Assert.Null(ConfigManager.ReadAzureIdentity(empty.RootElement));
+    }
+
+    [Fact]
+    public void ConfigScope_PinsSelectedFileAcrossLoginIdentityChanges()
+    {
+        ConfigManager.LoadConfig();
+        var originalFile = ConfigManager.GetConfigFile();
+        using (ConfigManager.PinConfiguration())
+        {
+            Environment.SetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR", Path.Combine(_tempConfigDir, "changed"));
+            Assert.Equal(originalFile, ConfigManager.GetConfigFile());
+            Assert.True(ConfigManager.SetLastUsed("original-profile"));
+        }
+        Environment.SetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_DIR", _tempConfigDir);
+        Assert.Equal("original-profile", ConfigManager.GetLastUsed());
+    }
+
+    [Fact]
+    public async Task ConfigScope_InteractiveLoginCannotRedirectProfilePersistence()
+    {
+        const string tenant = "11111111-1111-1111-1111-111111111111";
+        var previousResolver = ConfigManager.AzureIdentityResolver;
+        string? currentIdentity = null;
+        ConfigManager.AzureIdentityResolver = () => currentIdentity;
+        try
+        {
+            var profile = new Profile
+            {
+                Name = "enterprise-origin", Type = "byok", Model = "logical", BaseUrl = "https://example.com",
+                Authentication = new() { Type = "entra", Tenant = tenant }
+            };
+            Assert.True(ConfigManager.AddProfile(profile));
+            var originalFile = ConfigManager.GetConfigFile();
+            Environment.SetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE", "auto");
+            using (ConfigManager.PinConfiguration())
+            {
+                var calls = 0;
+                await EnterpriseAuth.Acquire(profile, true, async args =>
+                {
+                    await Task.Yield();
+                    calls++;
+                    if (calls == 1) return new AzureResult(1, "");
+                    if (args[0] == "login")
+                    {
+                        currentIdentity = $"{tenant}__signed-in@contoso.com";
+                        return new AzureResult(0, "");
+                    }
+                    if (args[1] == "show")
+                        return new AzureResult(0, JsonSerializer.Serialize(new { tenantId = tenant }));
+                    return new AzureResult(0, JsonSerializer.Serialize(new
+                    {
+                        accessToken = "test-only-transient-token", expires_on = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()
+                    }));
+                }, () => DateTimeOffset.UtcNow);
+                Assert.Equal(originalFile, ConfigManager.GetConfigFile());
+                Assert.True(ConfigManager.SetLastUsed(profile.Name));
+                Assert.Equal(profile.Name, ConfigManager.GetProfile(profile.Name)!.Name);
+            }
+            var newlyResolvedFile = ConfigManager.GetConfigFile();
+            Assert.NotEqual(originalFile, newlyResolvedFile);
+            Assert.False(File.Exists(newlyResolvedFile));
+            var original = JsonSerializer.Deserialize<Config>(File.ReadAllText(originalFile))!;
+            Assert.Equal(profile.Name, original.LastUsed);
+            Assert.Contains(original.Profiles, p => p.Name == profile.Name);
+            Assert.DoesNotContain("test-only-transient-token", File.ReadAllText(originalFile));
+        }
+        finally
+        {
+            ConfigManager.AzureIdentityResolver = previousResolver;
+            Environment.SetEnvironmentVariable("COPILOT_BYOK_MODEL_SWITCHER_CONFIG_SCOPE", "global");
+        }
     }
 
 }

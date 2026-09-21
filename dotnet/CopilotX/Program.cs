@@ -10,22 +10,27 @@ class Program
 {
     static readonly string[] DefaultMcpCompatServers = ["foundry-mcp", "context7", "msx-mcp", "azure", "workiq", "powerbi-remote"];
 
-    static string GetAzureCliCommand()
-    {
-        return OperatingSystem.IsWindows() ? "az.cmd" : "az";
-    }
-
     static string EscapeMarkup(string value)
     {
         return Markup.Escape(value ?? string.Empty);
     }
 
-    static string QuoteForCmd(string value)
+    static int Main(string[] args)
     {
-        return $"\"{(value ?? string.Empty).Replace("\"", "\\\"")}\"";
+        try { return RunCommand(args); }
+        catch (InvalidOperationException ex)
+        {
+            AnsiConsole.MarkupLine($"[red]{EscapeMarkup(ex.Message)}[/]");
+            return 1;
+        }
+        catch
+        {
+            AnsiConsole.MarkupLine("[red]Operation failed. Check configuration and installed CLI tools.[/]");
+            return 1;
+        }
     }
 
-    static int Main(string[] args)
+    static int RunCommand(string[] args)
     {
         if (args.Length == 0)
         {
@@ -69,8 +74,8 @@ class Program
         table.AddRow("[cyan]manage[/]", "Interactive profile management (Use/Remove/Add/Import/MCP)");
         table.AddRow("[cyan]mcp-compat <profile> [[--action set|reset|all|none]][/]", "Set or reset MCP compatibility servers for an Azure BYOK/proxy profile");
         table.AddRow("[cyan]remove [[profiles...]][/]", "Remove one or more profiles (interactive multi-select)");
-        table.AddRow("[cyan]use <profile> [[args...]][/]", "Switch to a specific profile and run gh copilot");
-        table.AddRow("[cyan]last [[args...]][/]", "Use the last used profile and run gh copilot");
+        table.AddRow("[cyan]use <profile> [[args...]][/]", "Switch to a specific profile and run Copilot");
+        table.AddRow("[cyan]last [[args...]][/]", "Use the last used profile and run Copilot");
         table.AddRow("[cyan]default [[args...]][/]", "Use the default Copilot profile");
         table.AddRow("[cyan]add[/]", "Add or update a profile interactively");
         table.AddRow("[cyan]import-foundry [[options]][/]", "Import profiles from Foundry/Azure OpenAI deployments");
@@ -78,7 +83,7 @@ class Program
 
         AnsiConsole.Write(table);
 
-        AnsiConsole.MarkupLine("\n[bold]Passthrough flags[/] [dim](forwarded to gh copilot, applies to use / last / default):[/]");
+        AnsiConsole.MarkupLine("\n[bold]Passthrough flags[/] [dim](forwarded to Copilot, applies to use / last / default):[/]");
         var flagTable = new Table();
         flagTable.AddColumn("Flag");
         flagTable.AddColumn("Description");
@@ -147,6 +152,8 @@ class Program
         table.AddColumn("Base URL");
         table.AddColumn("Model");
         table.AddColumn("Token Limits");
+        table.AddColumn("Authentication / tenant / resource");
+        table.AddColumn("Deployment / preflight");
 
         var profileList = profiles.ToList();
         for (int i = 0; i < profileList.Count; i++)
@@ -160,11 +167,13 @@ class Program
             table.AddRow(
                 $"[dim]{i + 1}[/]",
                 marker,
-                $"[cyan]{profile.Name}[/]",
-                profile.Type,
-                baseUrl,
-                model,
-                tokenInfo
+                $"[cyan]{EscapeMarkup(profile.Name)}[/]",
+                EscapeMarkup(profile.Type),
+                EscapeMarkup(baseUrl),
+                EscapeMarkup(model),
+                tokenInfo,
+                EscapeMarkup($"{profile.Authentication?.Type ?? "legacy"} / {profile.Authentication?.Tenant ?? "default"} / {profile.Authentication?.Resource ?? (EnterpriseAuth.IsEntra(profile) ? EnterpriseAuth.DefaultResource : "N/A")}"),
+                EscapeMarkup($"{profile.Deployment ?? "N/A"} / {profile.Authentication?.Preflight == true}")
             );
         }
 
@@ -497,6 +506,7 @@ class Program
 
     static async Task<int> ExecuteWithProfile(string profileName, string[] copilotArgs)
     {
+        using var configScope = ConfigManager.PinConfiguration();
         var profile = ConfigManager.GetProfile(profileName);
 
         if (profile == null)
@@ -506,22 +516,18 @@ class Program
             return 1;
         }
 
+        if (FoundryImportHelpers.IsKnownNonChatModel(profile.Model ?? profile.Deployment))
+        {
+            throw new InvalidOperationException(
+                $"Profile '{profile.Name}' uses model '{profile.Model ?? profile.Deployment}', which does not support Copilot text/chat requests. Select a chat-capable deployment instead.");
+        }
+
+        EnterpriseAuth.ValidateLaunchArguments(profile, copilotArgs);
+        EnterpriseAuth.Validate(profile);
+        if (EnterpriseAuth.IsEntra(profile))
+            EnterpriseAuth.GuardRegistry(EnterpriseAuth.CopyEnvironment(), Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         AnsiConsole.MarkupLine($"[green]Using profile:[/] {Markup.Escape(profile.Name)} ([dim]{Markup.Escape(profile.Type)}[/])");
         AnsiConsole.MarkupLine($"[dim]Token limits: {EscapeMarkup(FormatProfileTokenInfo(profile))}[/]");
-
-        AuthEnvironmentResult envInfo;
-        try
-        {
-            envInfo = await SetEnvironmentForProfile(profile);
-        }
-        catch (Exception ex)
-        {
-            AnsiConsole.MarkupLine($"[red]Error setting auth environment: {ex.Message}[/]");
-            AnsiConsole.MarkupLine("[dim]For Azure CLI token auth, ensure az is installed and you are logged in: az login[/]");
-            return 1;
-        }
-
-        ConfigManager.SetLastUsed(profileName);
 
         var userRequestedInteractive = copilotArgs.Length == 0;
 
@@ -546,25 +552,42 @@ class Program
 
         var effectiveCopilotArgs = BuildCopilotArgs(profile, copilotArgs);
 
+        AuthEnvironmentResult envInfo;
         try
         {
-            var result = await RunCopilot(effectiveCopilotArgs, userRequestedInteractive);
+            envInfo = await SetEnvironmentForProfile(profile, userRequestedInteractive && !Console.IsInputRedirected);
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Error setting auth environment: {EscapeMarkup(ex.Message)}[/]");
+            AnsiConsole.MarkupLine("[dim]For Azure CLI token auth, ensure az is installed and you are logged in: az login[/]");
+            return 1;
+        }
 
-            if (result.ExitCode != 0 && envInfo.UsedAzureCliToken && IsTokenFailure(result.Output))
+        ConfigManager.SetLastUsed(profileName);
+        if (envInfo.ExpiresAt is { } expiry)
+            EnterpriseAuth.EnsureTokenLifetime(expiry, DateTimeOffset.UtcNow);
+
+        try
+        {
+            var result = await RunCopilot(profile, effectiveCopilotArgs, userRequestedInteractive, envInfo.Environment);
+
+            if (ShouldRetry(profile, result.ExitCode, envInfo.UsedAzureCliToken, result.Output))
             {
                 AnsiConsole.MarkupLine("[yellow]Detected token-related auth failure. Refreshing Azure CLI token and retrying once...[/]");
                 var refreshedToken = await GetAzureCliToken(profile);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", refreshedToken);
-                result = await RunCopilot(effectiveCopilotArgs, userRequestedInteractive);
+                envInfo.Environment.Remove("COPILOT_PROVIDER_API_KEY");
+                envInfo.Environment["COPILOT_PROVIDER_BEARER_TOKEN"] = refreshedToken;
+                result = await RunCopilot(profile, effectiveCopilotArgs, userRequestedInteractive, envInfo.Environment);
             }
 
             return result.ExitCode;
         }
-        catch (Exception ex)
+        catch
         {
-            AnsiConsole.MarkupLine($"[red]Error executing gh copilot: {ex.Message}[/]");
-            AnsiConsole.MarkupLine("[dim]Make sure GitHub Copilot CLI is installed: gh extension install github/gh-copilot[/]");
+            AnsiConsole.MarkupLine("[red]Unable to execute Copilot. Ensure the selected CLI is installed (standalone copilot for Entra; gh copilot for legacy profiles). No Entra request is replayed.[/]");
+            if (OperatingSystem.IsWindows() && EnterpriseAuth.IsEntra(profile))
+                AnsiConsole.MarkupLine("[dim]Windows requires native copilot.exe on PATH, or a complete npm @github/copilot installation with node.exe available.[/]");
             return 1;
         }
     }
@@ -767,16 +790,9 @@ class Program
         return baseUrl.Contains(".openai.azure.com") || providerType == "azure";
     }
 
-    static string GetAzureDeploymentFromBaseUrl(string? baseUrl)
-    {
-        if (string.IsNullOrWhiteSpace(baseUrl)) return string.Empty;
-        var match = Regex.Match(baseUrl, @"/openai/deployments/([^/?#]+)", RegexOptions.IgnoreCase);
-        if (!match.Success) return string.Empty;
-        return Uri.UnescapeDataString(match.Groups[1].Value);
-    }
-
     static bool ShouldUseAzureCliToken(Profile profile, bool hasApiKey)
     {
+        if (profile.Authentication != null) return false;
         var mode = (profile.AzureCliToken ?? "auto").ToLowerInvariant();
 
         if (mode == "on")
@@ -797,57 +813,13 @@ class Program
         var scope = string.IsNullOrWhiteSpace(profile.TokenScope)
             ? "https://cognitiveservices.azure.com/.default"
             : profile.TokenScope;
-
-        ProcessStartInfo startInfo;
-
-        if (OperatingSystem.IsWindows())
+        var response = await EnterpriseAuth.RunAzure(["account", "get-access-token", "--scope", scope,
+            "--query", "accessToken", "-o", "tsv"]);
+        if (response.ExitCode != 0)
         {
-            var commandLine = string.Join(" ", new[] { "az", "account", "get-access-token", "--scope", QuoteForCmd(scope), "--query", "accessToken", "-o", "tsv" });
-            startInfo = new ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = $"/d /s /c \"{commandLine}\"",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
+            throw new InvalidOperationException("Azure token acquisition failed. Check az login and the configured scope.");
         }
-        else
-        {
-            startInfo = new ProcessStartInfo
-            {
-                FileName = GetAzureCliCommand(),
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            startInfo.ArgumentList.Add("account");
-            startInfo.ArgumentList.Add("get-access-token");
-            startInfo.ArgumentList.Add("--scope");
-            startInfo.ArgumentList.Add(scope);
-            startInfo.ArgumentList.Add("--query");
-            startInfo.ArgumentList.Add("accessToken");
-            startInfo.ArgumentList.Add("-o");
-            startInfo.ArgumentList.Add("tsv");
-        }
-
-        var process = Process.Start(startInfo);
-        if (process == null)
-        {
-            throw new InvalidOperationException("Failed to start az CLI process.");
-        }
-
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        var stderr = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException($"az account get-access-token failed (exit {process.ExitCode}): {stderr.Trim()}");
-        }
-
-        var token = stdout.Trim();
+        var token = response.Output.Trim();
         if (string.IsNullOrWhiteSpace(token))
         {
             throw new InvalidOperationException("az CLI returned an empty access token.");
@@ -856,24 +828,24 @@ class Program
         return token;
     }
 
-    internal static void SetProviderTokenLimitEnvironment(Profile profile)
+    internal static void SetProviderTokenLimitEnvironment(Profile profile, IDictionary<string, string?> environment)
     {
         if (profile.MaxOutputTokens.HasValue)
         {
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", profile.MaxOutputTokens.Value.ToString());
+            environment["COPILOT_PROVIDER_MAX_OUTPUT_TOKENS"] = profile.MaxOutputTokens.Value.ToString();
         }
         else
         {
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", null);
+            environment.Remove("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS");
         }
 
         if (profile.MaxPromptTokens.HasValue)
         {
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", profile.MaxPromptTokens.Value.ToString());
+            environment["COPILOT_PROVIDER_MAX_PROMPT_TOKENS"] = profile.MaxPromptTokens.Value.ToString();
         }
         else
         {
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", null);
+            environment.Remove("COPILOT_PROVIDER_MAX_PROMPT_TOKENS");
         }
     }
 
@@ -947,56 +919,48 @@ class Program
         throw new InvalidOperationException($"Option --{optionName} must be a positive integer.");
     }
 
-    static async Task<AuthEnvironmentResult> SetEnvironmentForProfile(Profile profile)
+    internal static async Task<AuthEnvironmentResult> SetEnvironmentForProfile(Profile profile, bool interactive = false,
+        IDictionary<string, string?>? inherited = null,
+        Func<IReadOnlyList<string>, Task<AzureResult>>? runAzure = null,
+        Func<DateTimeOffset>? now = null,
+        Func<Profile, Task<string>>? legacyToken = null,
+        HttpClient? preflightClient = null)
     {
+        EnterpriseAuth.Validate(profile);
+        inherited ??= EnterpriseAuth.CopyEnvironment();
+        var environment = EnterpriseAuth.CleanEnvironment(inherited);
+        var result = new AuthEnvironmentResult { Environment = environment };
         if (profile.Type == "copilot")
         {
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BASE_URL", null);
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", null);
-            Environment.SetEnvironmentVariable("COPILOT_MODEL", null);
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_TYPE", null);
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", null);
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", null);
-            return new AuthEnvironmentResult { UsedAzureCliToken = false };
+            return result;
         }
         else if (profile.Type == "byok" || profile.Type == "proxy")
         {
             if (!string.IsNullOrEmpty(profile.BaseUrl))
             {
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BASE_URL", profile.BaseUrl);
+                environment["COPILOT_PROVIDER_BASE_URL"] = profile.BaseUrl;
             }
 
             if (!string.IsNullOrEmpty(profile.Model))
             {
-                var modelForProvider = profile.Model;
-                if (IsAzureProfile(profile))
-                {
-                    var deploymentName = GetAzureDeploymentFromBaseUrl(profile.BaseUrl);
-                    if (!string.IsNullOrWhiteSpace(deploymentName)
-                        && !string.Equals(modelForProvider, deploymentName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        // Azure BYOK providers expect the deployment identifier as COPILOT_MODEL.
-                        modelForProvider = deploymentName;
-                        AnsiConsole.MarkupLine($"[dim]Using Azure deployment name '{EscapeMarkup(deploymentName)}' as model for provider compatibility.[/]");
-                    }
-                }
-
-                Environment.SetEnvironmentVariable("COPILOT_MODEL", modelForProvider);
+                var wireModel = EnterpriseAuth.WireModel(profile);
+                environment["COPILOT_MODEL"] = wireModel;
+                environment["COPILOT_PROVIDER_MODEL_ID"] = profile.Model;
+                environment["COPILOT_PROVIDER_WIRE_MODEL"] = wireModel;
             }
 
             string? resolvedApiKey = null;
 
             if (!string.IsNullOrEmpty(profile.ApiKeyEnv))
             {
-                var apiKey = Environment.GetEnvironmentVariable(profile.ApiKeyEnv);
+                inherited.TryGetValue(profile.ApiKeyEnv, out var apiKey);
                 if (!string.IsNullOrEmpty(apiKey))
                 {
                     resolvedApiKey = apiKey;
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[yellow]Warning: Environment variable {profile.ApiKeyEnv} is not set[/]");
+                    AnsiConsole.MarkupLine($"[yellow]Warning: Environment variable {EscapeMarkup(profile.ApiKeyEnv)} is not set[/]");
                 }
             }
             else if (!string.IsNullOrEmpty(profile.ApiKey))
@@ -1005,34 +969,43 @@ class Program
             }
 
             var useAzureCliToken = ShouldUseAzureCliToken(profile, !string.IsNullOrEmpty(resolvedApiKey));
-            if (useAzureCliToken)
+            if (EnterpriseAuth.IsEntra(profile))
             {
-                var token = await GetAzureCliToken(profile);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", token);
+                EnterpriseAuth.GuardRegistry(inherited, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+                var token = await EnterpriseAuth.Acquire(profile, interactive, runAzure ?? EnterpriseAuth.RunAzure, now ?? (() => DateTimeOffset.UtcNow));
+                environment["COPILOT_PROVIDER_BEARER_TOKEN"] = token.AccessToken;
+                result.ExpiresAt = token.ExpiresAt;
+                AnsiConsole.MarkupLine($"[dim]Entra token expires {EscapeMarkup(token.ExpiresAt.ToString("u"))}. Running child sessions cannot refresh; restart after expiry. Requests are never automatically replayed.[/]");
+                if (profile.Authentication!.Preflight)
+                {
+                    AnsiConsole.MarkupLine("[yellow]Running opted-in preflight: one minimal billed inference request.[/]");
+                    using var client = preflightClient == null ? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(20) } : null;
+                    await EnterpriseAuth.Preflight(profile, token.AccessToken, preflightClient ?? client!);
+                }
+            }
+            else if (useAzureCliToken)
+            {
+                var token = await (legacyToken ?? GetAzureCliToken)(profile);
+                environment["COPILOT_PROVIDER_BEARER_TOKEN"] = token;
             }
             else if (!string.IsNullOrEmpty(resolvedApiKey))
             {
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", resolvedApiKey);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", null);
+                environment["COPILOT_PROVIDER_API_KEY"] = resolvedApiKey;
             }
-            else
+
+            var providerType = string.IsNullOrWhiteSpace(profile.ProviderType) && EnterpriseAuth.IsEntra(profile)
+                ? "azure" : profile.ProviderType;
+            if (!string.IsNullOrEmpty(providerType))
             {
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", null);
+                environment["COPILOT_PROVIDER_TYPE"] = providerType;
             }
 
-            if (!string.IsNullOrEmpty(profile.ProviderType))
-            {
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_TYPE", profile.ProviderType);
-            }
-
-            SetProviderTokenLimitEnvironment(profile);
-
-            return new AuthEnvironmentResult { UsedAzureCliToken = useAzureCliToken };
+            SetProviderTokenLimitEnvironment(profile, environment);
+            result.UsedAzureCliToken = useAzureCliToken;
+            return result;
         }
 
-        return new AuthEnvironmentResult { UsedAzureCliToken = false };
+        return result;
     }
 
     static bool IsTokenFailure(string output)
@@ -1053,38 +1026,24 @@ class Program
             || lower.Contains("permission denied");
     }
 
-    static async Task<ProcessRunResult> RunCopilot(string[] copilotArgs, bool interactiveMode)
+    internal static bool ShouldRetry(Profile profile, int exitCode, bool legacyToken, string output) =>
+        !EnterpriseAuth.IsEntra(profile) && exitCode != 0 && legacyToken && IsTokenFailure(output);
+
+    static async Task<ProcessRunResult> RunCopilot(Profile profile, string[] copilotArgs, bool interactiveMode, IDictionary<string, string?> environment)
     {
         if (interactiveMode)
         {
-            AnsiConsole.MarkupLine("[dim]Launching gh copilot in interactive mode. Type your question below:[/]");
+            AnsiConsole.MarkupLine("[dim]Launching Copilot in interactive mode. Type your question below:[/]");
             AnsiConsole.MarkupLine("[dim]If prompted to trust this folder, choose option 2 once to remember it.[/]");
             AnsiConsole.MarkupLine("");
 
-            // Interactive gh copilot expects a real terminal (TTY). Avoid redirected pipes here.
-            var interactiveStartInfo = new ProcessStartInfo
-            {
-                FileName = "gh",
-                UseShellExecute = false,
-                RedirectStandardInput = false,
-                RedirectStandardOutput = false,
-                RedirectStandardError = false
-            };
-
-            interactiveStartInfo.ArgumentList.Add("copilot");
-            if (copilotArgs.Length > 0)
-            {
-                interactiveStartInfo.ArgumentList.Add("--");
-                foreach (var arg in copilotArgs)
-                {
-                    interactiveStartInfo.ArgumentList.Add(arg);
-                }
-            }
+            // Interactive Copilot expects a real terminal (TTY). Avoid redirected pipes here.
+            var interactiveStartInfo = EnterpriseAuth.ChildStartInfo(profile, copilotArgs, environment, true);
 
             var interactiveProcess = Process.Start(interactiveStartInfo);
             if (interactiveProcess == null)
             {
-                throw new InvalidOperationException("Failed to start gh copilot.");
+                throw new InvalidOperationException("Failed to start Copilot.");
             }
 
             await interactiveProcess.WaitForExitAsync();
@@ -1096,29 +1055,12 @@ class Program
             };
         }
 
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "gh",
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-
-        startInfo.ArgumentList.Add("copilot");
-        if (copilotArgs.Length > 0)
-        {
-            startInfo.ArgumentList.Add("--");
-            foreach (var arg in copilotArgs)
-            {
-                startInfo.ArgumentList.Add(arg);
-            }
-        }
+        var startInfo = EnterpriseAuth.ChildStartInfo(profile, copilotArgs, environment, false);
 
         var process = Process.Start(startInfo);
         if (process == null)
         {
-            throw new InvalidOperationException("Failed to start gh copilot.");
+            throw new InvalidOperationException("Failed to start Copilot.");
         }
 
         _ = Task.Run(async () =>
@@ -1194,34 +1136,53 @@ class Program
         {
             profile.BaseUrl = AnsiConsole.Ask<string>("Base [cyan]URL[/]:", string.Empty);
             profile.Model = AnsiConsole.Ask<string>("[cyan]Model[/]:", string.Empty);
+            var deployment = AnsiConsole.Ask<string>("[cyan]Deployment[/] (optional; defaults to model):", string.Empty);
+            profile.Deployment = string.IsNullOrWhiteSpace(deployment) ? null : deployment;
+            var authType = AnsiConsole.Prompt(new SelectionPrompt<string>()
+                .Title("[cyan]Authentication[/]:")
+                .AddChoices("entra", "apiKey", "legacy"));
+            if (authType != "legacy") profile.Authentication = new ProfileAuthentication { Type = authType };
 
-            var apiKeyChoice = AnsiConsole.Prompt(
-                new SelectionPrompt<string>()
-                    .Title("API Key [cyan]source[/]:")
-                    .AddChoices(new[] { "env", "direct", "none" }));
-
-            if (apiKeyChoice == "env")
+            if (authType == "entra")
             {
-                profile.ApiKeyEnv = AnsiConsole.Ask<string>("Environment variable [cyan]name[/]:", string.Empty);
+                var tenant = AnsiConsole.Ask<string>("Entra [cyan]tenant UUID[/] (optional):", string.Empty);
+                profile.Authentication!.Tenant = string.IsNullOrWhiteSpace(tenant) ? null : tenant;
+                profile.Authentication.Resource = AnsiConsole.Ask<string>("Entra [cyan]resource[/] (override only when required by the endpoint):", EnterpriseAuth.DefaultResource);
+                profile.Authentication.Preflight = AnsiConsole.Confirm("Enable a minimal [yellow]billed[/] inference preflight?", false);
             }
-            else if (apiKeyChoice == "direct")
+            else
             {
-                profile.ApiKey = AnsiConsole.Prompt(
-                    new TextPrompt<string>("API [cyan]Key[/]:")
-                        .Secret());
+                var apiKeyChoice = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("API Key [cyan]source[/]:")
+                        .AddChoices(new[] { "env", "direct", "none" }));
+
+                if (apiKeyChoice == "env")
+                {
+                    profile.ApiKeyEnv = AnsiConsole.Ask<string>("Environment variable [cyan]name[/]:", string.Empty);
+                }
+                else if (apiKeyChoice == "direct")
+                {
+                    profile.ApiKey = AnsiConsole.Prompt(
+                        new TextPrompt<string>("API [cyan]Key[/]:")
+                            .Secret());
+                }
+
+                if (authType == "legacy")
+                {
+                    profile.AzureCliToken = AnsiConsole.Prompt(
+                        new SelectionPrompt<string>()
+                            .Title("Azure CLI token [cyan]mode[/]:")
+                            .AddChoices(new[] { "auto", "on", "off" }));
+
+                    if (profile.AzureCliToken == "auto" || profile.AzureCliToken == "on")
+                    {
+                        profile.TokenScope = AnsiConsole.Ask<string>("Azure token [cyan]scope[/] (optional):", string.Empty);
+                    }
+                }
             }
 
             profile.ProviderType = AnsiConsole.Ask<string>("Provider [cyan]type[/] (optional):", string.Empty);
-
-            profile.AzureCliToken = AnsiConsole.Prompt(
-                new SelectionPrompt<string>()
-                    .Title("Azure CLI token [cyan]mode[/]:")
-                    .AddChoices(new[] { "auto", "on", "off" }));
-
-            if (profile.AzureCliToken == "auto" || profile.AzureCliToken == "on")
-            {
-                profile.TokenScope = AnsiConsole.Ask<string>("Azure token [cyan]scope[/] (optional):", string.Empty);
-            }
 
             profile.MaxOutputTokens = AskOptionalInt("Max [cyan]output tokens[/] (optional):");
             profile.MaxPromptTokens = AskOptionalInt("Max [cyan]prompt tokens[/] (optional):");
@@ -1279,58 +1240,19 @@ class Program
 
     static async Task<JsonDocument> RunAzJson(params string[] azArgs)
     {
-        ProcessStartInfo startInfo;
-
-        if (OperatingSystem.IsWindows())
+        var result = await EnterpriseAuth.RunAzure(azArgs);
+        if (result.ExitCode != 0)
         {
-            var commandLine = string.Join(" ", new[] { "az" }.Concat(azArgs.Select(QuoteForCmd)));
-            startInfo = new ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = $"/d /s /c \"{commandLine}\"",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-        }
-        else
-        {
-            startInfo = new ProcessStartInfo
-            {
-                FileName = GetAzureCliCommand(),
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            foreach (var arg in azArgs)
-            {
-                startInfo.ArgumentList.Add(arg);
-            }
-        }
-
-        var process = Process.Start(startInfo);
-        if (process == null)
-        {
-            throw new InvalidOperationException("Failed to start az CLI process.");
-        }
-
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        var stderr = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException($"az {string.Join(" ", azArgs)} failed (exit {process.ExitCode}): {stderr.Trim()}");
+            throw new InvalidOperationException("Azure discovery failed. Check az login, subscription access, and account settings.");
         }
 
         try
         {
-            return JsonDocument.Parse(string.IsNullOrWhiteSpace(stdout) ? "[]" : stdout);
+            return JsonDocument.Parse(string.IsNullOrWhiteSpace(result.Output) ? "[]" : result.Output);
         }
-        catch (Exception ex)
+        catch
         {
-            throw new InvalidOperationException($"Failed to parse az output: {ex.Message}");
+            throw new InvalidOperationException("Azure discovery returned invalid metadata.");
         }
     }
 
@@ -1569,7 +1491,7 @@ class Program
                     if (!shouldAdd)
                     {
                         shouldAdd = AnsiConsole.Confirm(
-                            $"Add deployment '{deployment.DeploymentName}' ({modelLabel}) as profile?",
+                            $"Add deployment '{EscapeMarkup(deployment.DeploymentName)}' ({EscapeMarkup(modelLabel)}) as profile?",
                             false);
                     }
 
@@ -1607,7 +1529,7 @@ class Program
                     if (effectiveMode == "each")
                     {
                         var customizePerModel = AnsiConsole.Confirm(
-                            $"Customize token limits for deployment '{deployment.DeploymentName}'?",
+                            $"Customize token limits for deployment '{EscapeMarkup(deployment.DeploymentName)}'?",
                             false);
 
                         if (customizePerModel)
@@ -1634,9 +1556,17 @@ class Program
                     var canonicalName = FoundryImportHelpers.BuildBaseProfileName(foundryAccount.Name, deployment.DeploymentName);
                     if (existingProfilesByName.TryGetValue(canonicalName, out var existingCanonical))
                     {
-                        var expectedBaseUrl = $"{endpoint}/openai/deployments/{deployment.DeploymentName}";
+                        var expectedBaseUrl = profile.BaseUrl;
                         var existingBaseUrl = (existingCanonical.BaseUrl ?? string.Empty).TrimEnd('/');
-                        if (string.Equals(existingBaseUrl, expectedBaseUrl, StringComparison.OrdinalIgnoreCase))
+                        var expectedLegacyBaseUrl = $"{endpoint}/openai/deployments/{deployment.DeploymentName}";
+                        if ((EnterpriseAuth.IsEntra(existingCanonical) &&
+                             EnterpriseAuth.WireModel(existingCanonical) == deployment.DeploymentName &&
+                             string.Equals(existingBaseUrl, expectedBaseUrl, StringComparison.OrdinalIgnoreCase)) ||
+                            (string.Equals(existingCanonical.Type, "byok", StringComparison.OrdinalIgnoreCase) &&
+                             string.Equals(existingCanonical.ProviderType, "azure", StringComparison.OrdinalIgnoreCase) &&
+                             string.Equals(existingCanonical.AzureCliToken, "auto", StringComparison.OrdinalIgnoreCase) &&
+                             EnterpriseAuth.WireModel(existingCanonical) == deployment.DeploymentName &&
+                             string.Equals(existingBaseUrl, expectedLegacyBaseUrl, StringComparison.OrdinalIgnoreCase)))
                         {
                             profile.Name = canonicalName;
                         }
@@ -1684,9 +1614,11 @@ class Program
         }
     }
 
-    class AuthEnvironmentResult
+    internal class AuthEnvironmentResult
     {
         public bool UsedAzureCliToken { get; set; }
+        public DateTimeOffset? ExpiresAt { get; set; }
+        public Dictionary<string, string?> Environment { get; set; } = new();
     }
 
     class ProcessRunResult

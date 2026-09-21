@@ -9,9 +9,9 @@
     <ToolCommandName>gh-copilot-byok</ToolCommandName>
     <PackageId>gh-copilot-byok</PackageId>
     <PackageOutputPath>./nupkg</PackageOutputPath>
-    <Version>1.0.0</Version>
+    <Version>2.4.0</Version>
     <Authors>gh-copilot-byok</Authors>
-    <Description>A lightweight CLI wrapper around GitHub Copilot CLI for easy model switching</Description>
+    <Description>An enterprise BYOK launcher for GitHub Copilot CLI with Microsoft Entra authentication and model profiles</Description>
     <PackageTags>github;copilot;cli;byok;azure-openai;foundry;dotnet-tool</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>

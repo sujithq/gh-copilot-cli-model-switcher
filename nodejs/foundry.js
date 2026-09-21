@@ -28,6 +28,15 @@ function mapDeployment(item) {
 }
 
 function isChatCapableDeployment(item) {
+  const modelName = ((item && item.properties && item.properties.model && item.properties.model.name)
+    || (item && item.model && item.model.name)
+    || (item && item.name)
+    || '').toLowerCase();
+
+  if (isKnownNonChatModel(modelName)) {
+    return false;
+  }
+
   const capabilities = item && item.properties && item.properties.capabilities || {};
   const chatCompletion = String(capabilities.chatCompletion || '').toLowerCase() === 'true';
   const responses = String(capabilities.responses || '').toLowerCase() === 'true';
@@ -37,12 +46,17 @@ function isChatCapableDeployment(item) {
   }
 
   // Fallback when capabilities are absent: exclude known embedding models.
-  const modelName = ((item && item.properties && item.properties.model && item.properties.model.name)
-    || (item && item.model && item.model.name)
-    || (item && item.name)
-    || '').toLowerCase();
+  return !isKnownNonChatModel(modelName);
+}
 
-  return !modelName.includes('embed');
+function isKnownNonChatModel(modelName) {
+  const normalized = String(modelName || '').trim().toLowerCase();
+  return normalized.includes('embed')
+    || normalized.includes('image')
+    || normalized.includes('whisper')
+    || normalized.includes('tts')
+    || normalized.includes('text-to-speech')
+    || normalized.includes('moderation');
 }
 
 function buildUniqueProfileName(accountName, deploymentName, existingNames) {
@@ -81,6 +95,7 @@ module.exports = {
   sanitizeProfilePart,
   isApplicableAccount,
   isChatCapableDeployment,
+  isKnownNonChatModel,
   mapDeployment,
   buildUniqueProfileName,
   buildImportedProfile

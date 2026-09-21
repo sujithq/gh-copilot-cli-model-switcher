@@ -284,6 +284,12 @@ internal static class FoundryImportHelpers
 
     internal static bool IsChatCapableDeployment(JsonElement item)
     {
+        var modelName = GetModelName(item);
+        if (IsKnownNonChatModel(modelName))
+        {
+            return false;
+        }
+
         if (item.TryGetProperty("properties", out var properties)
             && properties.TryGetProperty("capabilities", out var capabilities)
             && capabilities.ValueKind == JsonValueKind.Object)
@@ -302,6 +308,22 @@ internal static class FoundryImportHelpers
         }
 
         // Fallback when capabilities are absent: exclude known embedding models.
+        return !IsKnownNonChatModel(modelName);
+    }
+
+    internal static bool IsKnownNonChatModel(string? modelName)
+    {
+        var normalized = (modelName ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized.Contains("embed")
+            || normalized.Contains("image")
+            || normalized.Contains("whisper")
+            || normalized.Contains("tts")
+            || normalized.Contains("text-to-speech")
+            || normalized.Contains("moderation");
+    }
+
+    private static string GetModelName(JsonElement item)
+    {
         var modelName = string.Empty;
         if (item.TryGetProperty("properties", out var props)
             && props.TryGetProperty("model", out var model)
@@ -319,7 +341,7 @@ internal static class FoundryImportHelpers
             modelName = deploymentNameProp.GetString() ?? string.Empty;
         }
 
-        return !modelName.Contains("embed", StringComparison.OrdinalIgnoreCase);
+        return modelName;
     }
 
     internal static string BuildUniqueProfileName(string accountName, string deploymentName, IEnumerable<string> existingNames)
@@ -347,7 +369,8 @@ internal static class FoundryImportHelpers
         FoundryDeployment deployment,
         IEnumerable<string> existingNames,
         int? maxOutputTokens = null,
-        int? maxPromptTokens = null)
+        int? maxPromptTokens = null,
+        string? tenant = null)
     {
         var normalizedEndpoint = (string.IsNullOrWhiteSpace(endpoint)
             ? $"https://{accountName}.openai.azure.com"
@@ -357,12 +380,16 @@ internal static class FoundryImportHelpers
         {
             Name = BuildUniqueProfileName(accountName, deployment.DeploymentName, existingNames),
             Type = "byok",
-            BaseUrl = $"{normalizedEndpoint}/openai/deployments/{deployment.DeploymentName}",
-            // For Azure OpenAI BYOK, COPILOT_MODEL must match deployment name.
-            Model = deployment.DeploymentName,
+            BaseUrl = EnterpriseAuth.NormalizeOpenAIBaseUrl(normalizedEndpoint),
+            Model = deployment.ModelName,
+            Deployment = deployment.DeploymentName,
             ProviderType = "azure",
-            AzureCliToken = "auto",
-            TokenScope = "https://cognitiveservices.azure.com/.default",
+            Authentication = new ProfileAuthentication
+            {
+                Type = "entra",
+                Resource = EnterpriseAuth.DefaultResource,
+                Tenant = tenant
+            },
             MaxOutputTokens = maxOutputTokens,
             MaxPromptTokens = maxPromptTokens
         };

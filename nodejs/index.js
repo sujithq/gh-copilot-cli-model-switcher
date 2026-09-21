@@ -11,6 +11,7 @@ const {
   sanitizeProfilePart,
   isApplicableAccount,
   isChatCapableDeployment,
+  isKnownNonChatModel,
   mapDeployment,
   buildImportedProfile
 } = require('./foundry');
@@ -626,6 +627,12 @@ async function executeWithProfile(profileName, copilotArgs = []) {
   if (!profile) {
     console.error(`Profile "${profileName}" not found.`);
     console.error('Use "copilot-byok-model-switcher list" to see available profiles.');
+    return 1;
+  }
+
+  if (isKnownNonChatModel(profile.model || profile.deployment)) {
+    console.error(`Profile "${profile.name}" uses a model that does not support Copilot text/chat requests.`);
+    console.error('Select a chat-capable deployment instead.');
     return 1;
   }
 

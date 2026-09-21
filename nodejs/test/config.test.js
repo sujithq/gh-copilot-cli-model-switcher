@@ -197,6 +197,17 @@ test('isChatCapableDeployment accepts chat and rejects embeddings', () => {
   assert.equal(embedding, false);
 });
 
+test('isChatCapableDeployment rejects image models even when responses is reported', () => {
+  assert.equal(foundry.isChatCapableDeployment({
+    name: 'gpt-image-2',
+    properties: {
+      model: { name: 'gpt-image-2' },
+      capabilities: { responses: 'true' }
+    }
+  }), false);
+  assert.equal(foundry.isKnownNonChatModel('gpt-image-2'), true);
+});
+
 test('isApplicableAccount accepts AIServices with flattened endpoint', () => {
   const applicable = foundry.isApplicableAccount({
     name: 'myfoundry',

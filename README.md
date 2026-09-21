@@ -4,7 +4,7 @@
 [![gh-copilot-byok](https://img.shields.io/nuget/dt/gh-copilot-byok)](https://www.nuget.org/packages/gh-copilot-byok)
 [![dotnet tool](https://img.shields.io/badge/.NET-Global%20Tool-blue)]()
 
-A lightweight CLI wrapper ("minitool") around GitHub Copilot CLI that enables easy switching between default Copilot models and custom BYOK (Bring Your Own Key) models.
+A profile-based launcher for GitHub Copilot CLI. The .NET tool also supports enterprise BYOK with just-in-time Microsoft Entra authentication.
 
 ## 🎯 Overview
 
@@ -33,7 +33,81 @@ This repository provides two implementations of the same tool:
 - **Features:** Beautiful colored CLI with interactive prompts
 - **Documentation:** [dotnet/CopilotX/README.md](dotnet/CopilotX/README.md)
 
-Both implementations share the same configuration format and provide identical functionality.
+Both implementations support the legacy configuration format. **Version 2.4.0's enterprise authentication features apply to the .NET tool only; Node.js is unchanged.** Do not open or edit new `authentication` profiles with the older Node.js implementation.
+
+## Enterprise authentication (.NET 2.4.0)
+
+The switcher remains useful where Microsoft Foundry API keys are disabled: it obtains an Entra access token using Azure CLI immediately before launching **standalone `copilot`**. Native `providers.json` addresses model registration, not this launch-time identity validation.
+
+Existing API-key profiles and `azureCliToken` / `tokenScope` profiles remain supported. Existing profiles without explicit Entra authentication retain the `gh copilot` launch path.
+
+### Credential-free profiles
+
+Run `gh-copilot-byok add` and select Entra authentication, or add a profile to the active JSON configuration:
+
+```json
+{
+  "name": "foundry-enterprise",
+  "type": "byok",
+  "providerType": "azure",
+  "baseUrl": "https://your-resource.services.ai.azure.com/openai/v1",
+  "model": "gpt-4.1",
+  "deployment": "my-gpt-deployment",
+  "authentication": {
+    "type": "entra",
+    "tenant": "00000000-0000-0000-0000-000000000000",
+    "resource": "https://ai.azure.com",
+    "preflight": false
+  }
+}
+```
+
+This is **switcher JSON**, not a Copilot `providers.json` schema. Replace the endpoint, model, deployment, and tenant with your configuration. Tenant is optional; when set, it must be a tenant ID (UUID) and must match the active Azure account. `model` identifies the model; `deployment` is the wire deployment name.
+
+- `authentication.type: "entra"` enables the new launch flow; `"apiKey"` explicitly selects the existing `apiKeyEnv` / `apiKey` workflow.
+- `resource` defaults to `https://ai.azure.com`, as in Microsoft's Foundry/OpenAI-v1 examples. Use `https://cognitiveservices.azure.com` for API surfaces requiring the Cognitive Services audience (including documented dated Azure OpenAI examples). **Do not infer audience from the hostname alone**: Foundry's v1 examples also use `openai.azure.com` hosts. Legacy `tokenScope` behavior is unchanged.
+- Do not put API keys or bearer tokens in an Entra profile. Conflicting credentials and unknown authentication properties are rejected.
+- When migrating an existing profile to explicit Entra authentication, remove `azureCliToken`, `tokenScope`, `apiKey`, and `apiKeyEnv`; configure the audience under `authentication.resource` instead.
+- Entra endpoints must use HTTPS. Only use trusted endpoints: the configured endpoint receives your bearer token.
+- Newly imported .NET Foundry profiles use explicit Entra authentication, an OpenAI-v1 endpoint, and the Foundry audience. Override the audience if required by your deployment's API guidance.
+
+```bash
+az login --tenant "<tenant-id>"
+gh-copilot-byok list
+gh-copilot-byok use foundry-enterprise
+```
+
+The launcher checks the Azure account and tenant, requests a token with expiration metadata, and refuses missing, malformed, expired, or near-expiry tokens (less than five minutes remaining). Interactive launches can offer Azure login when no session is available; non-interactive launches fail with login guidance instead.
+
+This initial flow targets Azure CLI developer/user or service-principal sessions, not a general Azure Identity credential chain. Azure CLI's token `--tenant` option is not supported for managed-identity or Cloud Shell accounts; managed/workload identity provisioning is outside this launcher.
+
+Provider variables are built in a separate child environment. Inherited provider credentials, API-key commands, model settings, and token limits are cleared before applying the selected profile. The launcher does not export the token into your shell, persist it in configuration, or include it in diagnostic output.
+
+### Registry precedence
+
+Copilot's active provider registry takes precedence over legacy `COPILOT_PROVIDER_*` variables when it declares any provider or model. For explicit Entra profiles, the launcher checks registry configuration **before acquiring credentials**. Because the complete registry schema and empty-file behavior are not documented, this release deliberately uses a **stricter guard**: any existing `providers.json` under `COPILOT_HOME` / `~/.copilot`, any explicit `COPILOT_PROVIDERS_CONFIG`, or an indeterminate/unreadable registry blocks launch.
+
+Keep your native registry intact. For an environment-based Entra session, use a dedicated `COPILOT_HOME` with no provider registry and unset `COPILOT_PROVIDERS_CONFIG` in the launching environment. This also separates Copilot's other user configuration. Passthrough `--config-dir` is rejected for explicit Entra profiles to avoid bypassing the guard. The launcher does not rewrite registries, fabricate empty ones, or persist credentials there.
+
+### RBAC and optional inference preflight
+
+An administrator must grant the identity the appropriate data-plane role, scoped to the resource: typically **Cognitive Services User** for general Foundry inference or **Cognitive Services OpenAI User** for Azure OpenAI. Management-plane access alone is not inference access. PIM activation, role propagation, network policy, and tenant policy can also affect access.
+
+Set `authentication.preflight: true` to send a minimal, non-streaming OpenAI-v1 chat-completions request before launch. This is **opt-in because it can incur inference charges** and requires the corresponding API surface and a chat-completions-compatible deployment. It does not create RBAC assignments, and success does not prove Copilot's required streaming and tool-calling support. Redirects are not followed and response bodies are not printed.
+
+- `401`: check token audience, tenant, and Azure login.
+- `403`: check inference RBAC, PIM activation, and network restrictions; a 403 is not proof of an RBAC-only failure.
+- Other failures can indicate endpoint, deployment, API, quota, or model-capability issues.
+
+### Token lifetime and security boundaries
+
+This is **token acquisition per launch**, not transparent token renewal. Azure CLI may return a still-valid cached token. The launcher displays expiry; restart Copilot through the launcher when the session outlives the token. It does not monitor expiry in the background, automatically replay prompts, or relaunch an explicit Entra session after an error.
+
+There is no documented standalone CLI bearer-token callback equivalent to the SDK's `bearerTokenProvider` in the sources linked below. `COPILOT_PROVIDER_API_KEY_COMMAND` is an API-key mechanism, not a documented bearer-token refresh hook.
+
+“No credentials stored in profiles” does **not** mean “no credentials on the machine”: Azure CLI maintains its own login cache, and the child process environment contains the token. Protect the machine and Azure CLI cache; use `az logout` when appropriate. Conditional Access and revocation remain subject to Azure's policies and token lifetime, not guarantees of instantaneous session revocation.
+
+Documentation review (19 September 2026): the linked official GitHub documentation and Microsoft documentation sources support the distinction between provider registration and launch-time bearer authentication. The registry's complete schema and empty-registry behavior remain unverified; the conservative guard avoids relying on either. Automated tests use simulated Azure/process/HTTP responses, not a live tenant or Foundry deployment.
 
 ## 📦 Quick Start
 
@@ -424,7 +498,9 @@ gh-copilot-byok handles this switching automatically based on the selected profi
 
 Use `import-foundry` to discover deployed models and generate `byok` profiles automatically.
 
-Each imported profile is configured with:
+New .NET imports use `providerType: "azure"`, separate `model` / `deployment`, an OpenAI-v1 endpoint, and `authentication: { "type": "entra", "resource": "https://ai.azure.com" }`.
+
+Legacy Node.js imports are configured with:
 - `providerType: "azure"`
 - `azureCliToken: "auto"`
 - `tokenScope: "https://cognitiveservices.azure.com/.default"`
@@ -511,7 +587,7 @@ Return Result
 1. **Use Environment Variables**: Store API keys in environment variables, not directly in config
 2. **API Key Security**: Use `apiKeyEnv` instead of `apiKey` in profiles
 3. **File Permissions**: Ensure `~/.copilot-byok-model-switcher/config.json` has appropriate permissions
-4. **Enterprise RBAC**: Use proxy layer for token-based authentication
+4. **Enterprise RBAC**: Use explicit Entra profiles in .NET for launch-time authentication, or a trusted proxy for continuous renewal
 5. **Identity Separation**: Azure user-scoped config keeps profiles separate when switching users with `az login`
 
 ## 🚀 Future Enhancements
@@ -530,7 +606,8 @@ Potential features for future versions:
 ## 📄 Prerequisites
 
 ### Common Requirements
-- GitHub Copilot CLI: `gh extension install github/gh-copilot`
+- Current standalone `copilot` for explicit .NET Entra profiles; existing legacy profiles use `gh copilot`.
+- Azure CLI (`az`) and inference RBAC for Entra authentication.
 
 ### Node.js Version
 - Node.js 14 or higher
@@ -541,7 +618,7 @@ Potential features for future versions:
 
 ## 🤝 Contributing
 
-Contributions are welcome! Both implementations should maintain feature parity.
+Contributions are welcome! Preserve legacy profile compatibility; the enterprise authentication release currently targets .NET only.
 
 ## 📜 License
 
@@ -549,6 +626,13 @@ MIT
 
 ## 🔗 Related Resources
 
+- [Copilot CLI configuration directory and registry precedence](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-config-dir-reference)
+- [Copilot CLI environment-variable reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference#environment-variables)
+- [Using BYOK models in Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-byok-models)
+- [Microsoft Foundry keyless examples and token audiences (official documentation source)](https://github.com/MicrosoftDocs/azure-ai-docs/blob/main/articles/foundry/foundry-models/includes/code-create-chat-client-entra.md)
+- [Foundry keyless RBAC guidance (official documentation source)](https://github.com/MicrosoftDocs/azure-ai-docs/blob/main/articles/foundry/foundry-models/includes/how-to-configure-entra-id-content.md)
+- [Azure OpenAI RBAC](https://learn.microsoft.com/azure/ai-services/openai/how-to/role-based-access-control)
+- [Azure CLI token metadata and expiry (official help source)](https://github.com/Azure/azure-cli/blob/dev/src/azure-cli/azure/cli/command_modules/profile/_help.py)
 - [GitHub Copilot CLI Documentation](https://docs.github.com/en/copilot/github-copilot-in-the-cli)
 - [OpenAI API Reference](https://platform.openai.com/docs/api-reference)
 - [Azure OpenAI Service](https://azure.microsoft.com/en-us/products/ai-services/openai-service)

@@ -10,6 +10,8 @@ This project publishes the .NET global tool package `gh-copilot-byok` to both Nu
 
 ## Release workflow
 
+The next .NET package version is **2.4.0**, adding enterprise Entra authentication. Node.js is unchanged. The Release Please manifest continues to describe the last released version until the generated release PR advances it; preparing source changes does not publish a release.
+
 1. Merge changes into `main` using conventional commit semantics (`feat:`, `fix:`, and `!`/`BREAKING CHANGE`).
 2. GitHub Actions workflow `Release Please` updates or opens a release PR with:
   - Calculated semantic version

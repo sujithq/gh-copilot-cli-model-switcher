@@ -63,18 +63,27 @@ cd dotnet/CopilotX.Tests && dotnet run
 }
 ```
 
-### Azure OpenAI (API Keys Disabled)
+### Azure OpenAI (API Keys Disabled, .NET 2.4.0+)
 ```json
 {
   "name": "azure-rbac-local",
   "type": "byok",
-  "baseUrl": "https://xxx.openai.azure.com/openai/deployments/gpt-4",
-  "model": "gpt-4",
+  "baseUrl": "https://xxx.openai.azure.com/openai/v1",
+  "model": "gpt-4.1",
+  "deployment": "my-deployment",
   "providerType": "azure",
-  "azureCliToken": "auto",
-  "tokenScope": "https://cognitiveservices.azure.com/.default"
+  "authentication": {
+    "type": "entra",
+    "tenant": "00000000-0000-0000-0000-000000000000",
+    "resource": "https://ai.azure.com",
+    "preflight": false
+  }
 }
 ```
+
+Replace the tenant ID and deployment. Requires Azure CLI login and standalone `copilot`; launch with `gh-copilot-byok use azure-rbac-local`. Tokens are acquired per launch, not refreshed in a running session. The resource defaults to `https://ai.azure.com` for Foundry/OpenAI-v1 examples; use the Cognitive Services audience when your API surface requires it, not based on hostname alone. Preflight is opt-in and potentially billable. Native provider registries must not override the launch environment. See [enterprise guidance](README.md#enterprise-authentication-net-240).
+
+Legacy `azureCliToken` / `tokenScope` profiles remain supported. Node.js is unchanged and does not support the new `authentication` schema.
 
 ### OpenAI
 ```json
