@@ -516,6 +516,12 @@ class Program
             return 1;
         }
 
+        if (FoundryImportHelpers.IsKnownNonChatModel(profile.Model ?? profile.Deployment))
+        {
+            throw new InvalidOperationException(
+                $"Profile '{profile.Name}' uses model '{profile.Model ?? profile.Deployment}', which does not support Copilot text/chat requests. Select a chat-capable deployment instead.");
+        }
+
         EnterpriseAuth.ValidateLaunchArguments(profile, copilotArgs);
         EnterpriseAuth.Validate(profile);
         if (EnterpriseAuth.IsEntra(profile))

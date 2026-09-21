@@ -284,6 +284,12 @@ internal static class FoundryImportHelpers
 
     internal static bool IsChatCapableDeployment(JsonElement item)
     {
+        var modelName = GetModelName(item);
+        if (IsKnownNonChatModel(modelName))
+        {
+            return false;
+        }
+
         if (item.TryGetProperty("properties", out var properties)
             && properties.TryGetProperty("capabilities", out var capabilities)
             && capabilities.ValueKind == JsonValueKind.Object)
@@ -302,6 +308,22 @@ internal static class FoundryImportHelpers
         }
 
         // Fallback when capabilities are absent: exclude known embedding models.
+        return !IsKnownNonChatModel(modelName);
+    }
+
+    internal static bool IsKnownNonChatModel(string? modelName)
+    {
+        var normalized = (modelName ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized.Contains("embed")
+            || normalized.Contains("image")
+            || normalized.Contains("whisper")
+            || normalized.Contains("tts")
+            || normalized.Contains("text-to-speech")
+            || normalized.Contains("moderation");
+    }
+
+    private static string GetModelName(JsonElement item)
+    {
         var modelName = string.Empty;
         if (item.TryGetProperty("properties", out var props)
             && props.TryGetProperty("model", out var model)
@@ -319,7 +341,7 @@ internal static class FoundryImportHelpers
             modelName = deploymentNameProp.GetString() ?? string.Empty;
         }
 
-        return !modelName.Contains("embed", StringComparison.OrdinalIgnoreCase);
+        return modelName;
     }
 
     internal static string BuildUniqueProfileName(string accountName, string deploymentName, IEnumerable<string> existingNames)

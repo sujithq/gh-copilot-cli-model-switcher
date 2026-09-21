@@ -113,6 +113,23 @@ public class ConfigManagerTests : IDisposable
     }
 
     [Fact]
+    public void IsChatCapableDeployment_RejectsImageModelsEvenWhenResponsesCapabilityIsReported()
+    {
+        using var doc = JsonDocument.Parse("""
+        {
+            "name": "gpt-image-2",
+            "properties": {
+                "model": { "name": "gpt-image-2" },
+                "capabilities": { "responses": "true" }
+            }
+        }
+        """);
+
+        Assert.False(FoundryImportHelpers.IsChatCapableDeployment(doc.RootElement));
+        Assert.True(FoundryImportHelpers.IsKnownNonChatModel("gpt-image-2"));
+    }
+
+    [Fact]
     public void MapDeployment_ReadsSuggestedTokenLimits_FromMetadata()
     {
         using var doc = JsonDocument.Parse("""
