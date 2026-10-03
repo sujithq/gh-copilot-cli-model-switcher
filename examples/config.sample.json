@@ -11,7 +11,10 @@
       "baseUrl": "https://your-resource.openai.azure.com/openai/deployments/gpt-4",
       "apiKeyEnv": "AZURE_OPENAI_KEY",
       "model": "gpt-4",
-      "azureCliToken": "off"
+      "azureCliToken": "off",
+      "providerAzureApiVersion": "2025-01-01",
+      "providerModelId": "gpt-4",
+      "providerWireModel": "gpt-4"
     },
     {
       "name": "ollama-llama3",

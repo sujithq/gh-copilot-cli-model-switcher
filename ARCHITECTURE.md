@@ -113,6 +113,7 @@ interface Profile {
 - `COPILOT_PROVIDER_API_KEY`
 - `COPILOT_MODEL`
 - `COPILOT_PROVIDER_TYPE`
+- .NET profiles may additionally map provider wire settings and token limits to their corresponding `COPILOT_PROVIDER_*` variables.
 
 **Logic**:
 
@@ -136,11 +137,12 @@ ELSE IF profile.type == 'byok' OR 'proxy':
     IF profile.providerType:
         SET COPILOT_PROVIDER_TYPE = profile.providerType
 
-EXECUTE gh copilot
+FOR .NET: EXECUTE copilot; if not found, EXECUTE gh copilot
+FOR Node.js: EXECUTE gh copilot
 
 IF auth/token failure detected AND azureCliToken was used:
     REFRESH token via az account get-access-token
-    RETRY gh copilot once
+    RETRY the selected CLI once
 ```
 
 ### 4. Copilot Launcher
@@ -149,7 +151,7 @@ IF auth/token failure detected AND azureCliToken was used:
 
 **Process**:
 1. Set environment variables
-2. Spawn `gh copilot` process with arguments
+2. For .NET, spawn standalone `copilot`, falling back to `gh copilot` only if it is not found; Node.js currently spawns `gh copilot`
 3. Inherit stdio for interactive experience
 4. Wait for process completion
 5. Return exit code
@@ -403,7 +405,8 @@ For local wrapper token mode:
 - No performance impact
 
 ### Process Overhead
-- Single process spawn to `gh copilot`
+- One process spawn to the standalone .NET `copilot` executable, or `gh copilot` compatibility fallback
+- Node.js currently spawns `gh copilot`
 - Stdio inheritance for interactive experience
 - No additional proxy overhead (unless configured)
 
@@ -439,11 +442,10 @@ For local wrapper token mode:
    Warning: Environment variable AZURE_OPENAI_KEY is not set
    ```
 
-3. **gh copilot Not Installed**:
+3. **Copilot CLI Not Installed**:
    ```
-   Error executing gh copilot: command not found
-   Make sure GitHub Copilot CLI is installed:
-   gh extension install github/gh-copilot
+   Error executing Copilot CLI: command not found
+   Install the standalone `copilot` CLI or (for .NET fallback / Node.js) the `gh copilot` extension.
    ```
 
 4. **Invalid Config**:

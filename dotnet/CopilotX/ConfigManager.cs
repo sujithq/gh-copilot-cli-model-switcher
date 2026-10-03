@@ -27,6 +27,18 @@ public class Profile
     [JsonPropertyName("providerType")]
     public string? ProviderType { get; set; }
 
+    [JsonPropertyName("providerWireApi")]
+    public string? ProviderWireApi { get; set; }
+
+    [JsonPropertyName("providerAzureApiVersion")]
+    public string? ProviderAzureApiVersion { get; set; }
+
+    [JsonPropertyName("providerModelId")]
+    public string? ProviderModelId { get; set; }
+
+    [JsonPropertyName("providerWireModel")]
+    public string? ProviderWireModel { get; set; }
+
     [JsonPropertyName("azureCliToken")]
     public string? AzureCliToken { get; set; }
 
@@ -316,6 +328,10 @@ public class ConfigManager
             apiKeyEnv = NormalizeCaseSensitive(profile.ApiKeyEnv),
             apiKey = NormalizeCaseSensitive(profile.ApiKey),
             providerType = Normalize(profile.ProviderType),
+            providerWireApi = Normalize(profile.ProviderWireApi),
+            providerAzureApiVersion = Normalize(profile.ProviderAzureApiVersion),
+            providerModelId = Normalize(profile.ProviderModelId),
+            providerWireModel = Normalize(profile.ProviderWireModel),
             azureCliToken = Normalize(profile.AzureCliToken),
             tokenScope = Normalize(profile.TokenScope),
             maxOutputTokens = profile.MaxOutputTokens,
@@ -360,6 +376,10 @@ public class ConfigManager
                 ApiKeyEnv = profile.ApiKeyEnv,
                 ApiKey = profile.ApiKey,
                 ProviderType = profile.ProviderType,
+                ProviderWireApi = profile.ProviderWireApi,
+                ProviderAzureApiVersion = profile.ProviderAzureApiVersion,
+                ProviderModelId = profile.ProviderModelId,
+                ProviderWireModel = profile.ProviderWireModel,
                 AzureCliToken = profile.AzureCliToken,
                 TokenScope = profile.TokenScope,
                 MaxOutputTokens = profile.MaxOutputTokens,

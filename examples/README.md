@@ -73,6 +73,21 @@ Notes:
 - `azureCliToken: auto` detects Azure profiles and uses Azure CLI token when API key is not configured.
 - On token/auth failures, gh-copilot-byok refreshes token and retries once.
 
+### .NET provider wire settings and CLI support
+
+The .NET implementation starts the standalone `copilot` executable first and falls back to `gh copilot` only if it is unavailable. API-key and bearer-token authentication remain separate options: use `apiKeyEnv`/`apiKey` for key auth, or `azureCliToken` for Azure CLI bearer-token auth. The selected profile sets only its corresponding Copilot auth variable.
+
+For the .NET implementation, BYOK and proxy profiles may also define these optional fields:
+
+| Profile field | Copilot CLI environment variable |
+|---|---|
+| `providerWireApi` | `COPILOT_PROVIDER_WIRE_API` |
+| `providerAzureApiVersion` | `COPILOT_PROVIDER_AZURE_API_VERSION` |
+| `providerModelId` | `COPILOT_PROVIDER_MODEL_ID` |
+| `providerWireModel` | `COPILOT_PROVIDER_WIRE_MODEL` |
+
+For Azure OpenAI, `providerModelId` is the underlying model name; `providerWireModel` is the deployment name sent to Azure. Refer to [GitHub's Copilot CLI BYOK documentation](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-byok-models) for details.
+
 ### OpenAI API
 
 ```json

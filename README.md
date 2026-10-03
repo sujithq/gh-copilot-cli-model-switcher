@@ -185,12 +185,18 @@ GitHub Copilot CLI can connect to external models via environment variables:
 - `COPILOT_PROVIDER_BEARER_TOKEN`
 - `COPILOT_MODEL`
 - `COPILOT_PROVIDER_TYPE`
+- `COPILOT_PROVIDER_WIRE_API`
+- `COPILOT_PROVIDER_AZURE_API_VERSION`
+- `COPILOT_PROVIDER_MODEL_ID`
+- `COPILOT_PROVIDER_WIRE_MODEL`
 - `COPILOT_PROVIDER_MAX_OUTPUT_TOKENS`
 - `COPILOT_PROVIDER_MAX_PROMPT_TOKENS`
 
 gh-copilot-byok can now source Azure CLI access tokens when API keys are disabled. In token mode, it sets `COPILOT_PROVIDER_BEARER_TOKEN` and clears `COPILOT_PROVIDER_API_KEY` to avoid auth-mode ambiguity.
 
-For Azure BYOK profiles, gh-copilot-byok also enables an MCP compatibility mode by default to avoid provider tool-count limits (e.g. `tools array too long`). It launches `gh copilot` with MCP-disable flags for common high-volume servers. Set `CBMS_DISABLE_MCP_COMPAT=off` to opt out.
+For Azure BYOK profiles, gh-copilot-byok also enables an MCP compatibility mode by default to avoid provider tool-count limits (e.g. `tools array too long`). Set `CBMS_DISABLE_MCP_COMPAT=off` to opt out.
+
+The .NET tool launches the standalone `copilot` executable first and falls back to `gh copilot` only if `copilot` is not found. The Node.js implementation currently launches `gh copilot`. See the [.NET CLI documentation](dotnet/CopilotX/README.md) for .NET-specific profile fields and launcher details.
 
 This allows connecting to:
 - OpenAI
@@ -240,7 +246,10 @@ Example JSON content:
       "type": "byok",
       "baseUrl": "https://xxx.openai.azure.com/openai/deployments/gpt",
       "apiKeyEnv": "AZURE_OPENAI_KEY",
-      "model": "gpt-4"
+      "model": "gpt-4",
+      "providerAzureApiVersion": "2025-01-01",
+      "providerModelId": "gpt-4",
+      "providerWireModel": "gpt"
     },
     {
       "name": "ollama-local",
@@ -303,6 +312,7 @@ Optional auth fields for `byok` and `proxy`:
 - `tokenScope`: Azure token scope for `az account get-access-token`
 - `maxOutputTokens`: Optional cap for generated output tokens
 - `maxPromptTokens`: Optional cap for prompt/context tokens sent to the provider
+- For the .NET tool, optional `providerWireApi`, `providerAzureApiVersion`, `providerModelId`, and `providerWireModel` fields map to `COPILOT_PROVIDER_WIRE_API`, `COPILOT_PROVIDER_AZURE_API_VERSION`, `COPILOT_PROVIDER_MODEL_ID`, and `COPILOT_PROVIDER_WIRE_MODEL`.
 - `maxTokens`: Legacy alias for `maxOutputTokens`; still read for compatibility but new configs should use `maxOutputTokens`
 
 #### 3. `proxy` - Proxy Configuration
@@ -488,7 +498,7 @@ gh-copilot-byok default
 1. **Config Manager**: Handles loading, saving, and managing profiles
 2. **Profile Switcher**: Sets environment variables based on profile
 3. **CLI Interface**: User-facing commands and interactions
-4. **Copilot Launcher**: Executes `gh copilot` with configured environment
+4. **Copilot Launcher**: The .NET tool starts `copilot` and falls back to `gh copilot`; the Node.js implementation currently starts `gh copilot`
 
 ### Flow
 
@@ -501,7 +511,7 @@ Load Profile Config
     ↓
 Set Environment Variables
     ↓
-Execute gh copilot
+Execute the selected Copilot CLI command
     ↓
 Return Result
 ```

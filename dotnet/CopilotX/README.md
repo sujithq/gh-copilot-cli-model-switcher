@@ -54,7 +54,9 @@ Full release instructions: [../../RELEASING.md](../../RELEASING.md)
 ## Prerequisites
 
 - .NET 10 SDK or higher
-- GitHub Copilot CLI installed: `gh extension install github/gh-copilot`
+- GitHub Copilot CLI installed as the standalone [`copilot` executable](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli), or as the legacy `gh copilot` extension (`gh extension install github/gh-copilot`).
+
+The .NET tool starts `copilot` first and falls back to `gh copilot` only when the standalone executable is not found. Standalone arguments are passed directly; the legacy extension receives them after `gh copilot --`.
 
 ## Usage
 
@@ -120,9 +122,9 @@ gh-copilot-byok mcp-compat foundry-myaccount-gpt-4-1 --action none
 gh-copilot-byok use <profile> [copilot-args..]
 ```
 
-Switch to a profile and run GitHub Copilot CLI with that configuration. Without extra arguments, launches `gh copilot` in interactive mode.
+Switch to a profile and run GitHub Copilot CLI with that configuration. Without extra arguments, launches the available CLI in interactive mode.
 
-All arguments after the profile name are forwarded directly to `gh copilot`.
+All arguments after the profile name are forwarded to the selected CLI.
 
 **Examples:**
 
@@ -358,6 +360,10 @@ Fields:
 - `apiKeyEnv`: Environment variable containing the API key
 - `apiKey`: Direct API key (alternative to `apiKeyEnv`, less secure)
 - `providerType`: Optional provider type
+- `providerWireApi`: Optional wire API protocol, mapped to `COPILOT_PROVIDER_WIRE_API`
+- `providerAzureApiVersion`: Optional Azure OpenAI API version, mapped to `COPILOT_PROVIDER_AZURE_API_VERSION`
+- `providerModelId`: Optional provider model ID, mapped to `COPILOT_PROVIDER_MODEL_ID`
+- `providerWireModel`: Optional model/deployment name sent to the provider, mapped to `COPILOT_PROVIDER_WIRE_MODEL`
 - `azureCliToken`: Optional token mode (`auto`, `on`, `off`)
 - `tokenScope`: Optional Azure token scope
 - `maxOutputTokens`: Optional max output tokens, mapped to `COPILOT_PROVIDER_MAX_OUTPUT_TOKENS`
@@ -370,15 +376,21 @@ Same as `byok`, useful for enterprise scenarios with API Management or token-bas
 
 ## How It Works
 
-The tool sets environment variables before launching `gh copilot`:
+The tool sets environment variables before launching the selected Copilot CLI executable:
 
 **Default Copilot Mode:**
 ```bash
 unset COPILOT_PROVIDER_BASE_URL
 unset COPILOT_PROVIDER_API_KEY
 unset COPILOT_MODEL
-gh copilot
+copilot
 ```
+
+Provider profiles can also specify the optional `providerWireApi`, `providerAzureApiVersion`, `providerModelId`, and `providerWireModel` fields. They map to `COPILOT_PROVIDER_WIRE_API`, `COPILOT_PROVIDER_AZURE_API_VERSION`, `COPILOT_PROVIDER_MODEL_ID`, and `COPILOT_PROVIDER_WIRE_MODEL`, respectively. These values and token limits are cleared when switching to a profile that does not define them.
+
+For Azure OpenAI, `providerModelId` is the underlying model name used by Copilot CLI for capability and token-limit selection; `providerWireModel` is the Azure deployment name sent to the provider. Both are distinct from the required `model` profile value (`COPILOT_MODEL`). See [GitHub's Copilot CLI BYOK documentation](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-byok-models) for current provider requirements.
+
+`apiKeyEnv`/`apiKey` and `azureCliToken` remain alternative authentication modes. API-key profiles set only `COPILOT_PROVIDER_API_KEY`; Azure CLI token profiles set only `COPILOT_PROVIDER_BEARER_TOKEN`.
 
 **BYOK Mode:**
 ```bash
@@ -387,7 +399,7 @@ export COPILOT_PROVIDER_API_KEY=<key>
 export COPILOT_MODEL=<model>
 export COPILOT_PROVIDER_MAX_OUTPUT_TOKENS=<max output tokens>
 export COPILOT_PROVIDER_MAX_PROMPT_TOKENS=<max prompt tokens>
-gh copilot
+copilot
 ```
 
 `maxOutputTokens` is useful when you want to cap generated output as Copilot CLI usage shifts from request-based to token-based accounting. If you also need to constrain how much context is sent to the provider, set `maxPromptTokens`.
@@ -410,7 +422,7 @@ To change the selection later, edit `mcpCompatServers` in your config file, or r
 
 **Non-interactive mode & tool permissions:**
 
-When you pass `-p`/`--prompt` (non-interactive mode), `gh copilot` cannot prompt for per-tool permission at runtime and will fail with `could not request permission from user`. gh-copilot-byok automatically adds `--allow-all-tools` for you so scripts and piped usage work without extra flags.
+When you pass `-p`/`--prompt` (non-interactive mode), Copilot CLI cannot prompt for per-tool permission at runtime and will fail with `could not request permission from user`. gh-copilot-byok automatically adds `--allow-all-tools` for you so scripts and piped usage work without extra flags.
 
 If you already specify any of the permission flags below, auto-injection is skipped:
 
@@ -584,8 +596,8 @@ Current tests include config scope/path resolution, default config creation, pro
 ### "Profile not found"
 Run `gh-copilot-byok list` to see available profiles or `gh-copilot-byok add` to create a new one.
 
-### "Error executing gh copilot"
-Ensure GitHub Copilot CLI is installed:
+### "Error executing Copilot CLI"
+Install the standalone CLI or the legacy `gh copilot` extension:
 ```bash
 gh extension install github/gh-copilot
 ```
