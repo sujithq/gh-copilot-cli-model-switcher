@@ -509,10 +509,9 @@ class Program
         AnsiConsole.MarkupLine($"[green]Using profile:[/] {Markup.Escape(profile.Name)} ([dim]{Markup.Escape(profile.Type)}[/])");
         AnsiConsole.MarkupLine($"[dim]Token limits: {EscapeMarkup(FormatProfileTokenInfo(profile))}[/]");
 
-        AuthEnvironmentResult envInfo;
         try
         {
-            envInfo = await SetEnvironmentForProfile(profile);
+            SetEnvironmentForProfile(profile);
         }
         catch (Exception ex)
         {
@@ -549,16 +548,6 @@ class Program
         try
         {
             var result = await RunCopilot(effectiveCopilotArgs, userRequestedInteractive);
-
-            if (result.ExitCode != 0 && envInfo.UsedAzureCliToken && IsTokenFailure(result.Output))
-            {
-                AnsiConsole.MarkupLine("[yellow]Detected token-related auth failure. Refreshing Azure CLI token and retrying once...[/]");
-                var refreshedToken = await GetAzureCliToken(profile);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", refreshedToken);
-                result = await RunCopilot(effectiveCopilotArgs, userRequestedInteractive);
-            }
-
             return result.ExitCode;
         }
         catch (Exception ex)
@@ -792,68 +781,20 @@ class Program
         return !hasApiKey && IsAzureProfile(profile);
     }
 
-    static async Task<string> GetAzureCliToken(Profile profile)
+    internal static string BuildAzureCliTokenCommand(string? tokenScope)
     {
-        var scope = string.IsNullOrWhiteSpace(profile.TokenScope)
+        var scope = string.IsNullOrWhiteSpace(tokenScope)
             ? "https://cognitiveservices.azure.com/.default"
-            : profile.TokenScope;
+            : tokenScope.Trim();
 
-        ProcessStartInfo startInfo;
-
-        if (OperatingSystem.IsWindows())
+        if (!Uri.TryCreate(scope, UriKind.Absolute, out var scopeUri)
+            || scopeUri.Scheme != Uri.UriSchemeHttps
+            || scope.Any(ch => !(char.IsLetterOrDigit(ch) || ch is ':' or '/' or '.' or '-' or '_')))
         {
-            var commandLine = string.Join(" ", new[] { "az", "account", "get-access-token", "--scope", QuoteForCmd(scope), "--query", "accessToken", "-o", "tsv" });
-            startInfo = new ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = $"/d /s /c \"{commandLine}\"",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-        }
-        else
-        {
-            startInfo = new ProcessStartInfo
-            {
-                FileName = GetAzureCliCommand(),
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            startInfo.ArgumentList.Add("account");
-            startInfo.ArgumentList.Add("get-access-token");
-            startInfo.ArgumentList.Add("--scope");
-            startInfo.ArgumentList.Add(scope);
-            startInfo.ArgumentList.Add("--query");
-            startInfo.ArgumentList.Add("accessToken");
-            startInfo.ArgumentList.Add("-o");
-            startInfo.ArgumentList.Add("tsv");
+            throw new InvalidOperationException("Azure token scope must be an HTTPS URL without shell-special characters.");
         }
 
-        var process = Process.Start(startInfo);
-        if (process == null)
-        {
-            throw new InvalidOperationException("Failed to start az CLI process.");
-        }
-
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        var stderr = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException($"az account get-access-token failed (exit {process.ExitCode}): {stderr.Trim()}");
-        }
-
-        var token = stdout.Trim();
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            throw new InvalidOperationException("az CLI returned an empty access token.");
-        }
-
-        return token;
+        return $"{GetAzureCliCommand()} account get-access-token --scope \"{scope}\" --query accessToken -o tsv";
     }
 
     internal static void SetProviderTokenLimitEnvironment(Profile profile)
@@ -947,8 +888,10 @@ class Program
         throw new InvalidOperationException($"Option --{optionName} must be a positive integer.");
     }
 
-    static async Task<AuthEnvironmentResult> SetEnvironmentForProfile(Profile profile)
+    internal static void SetEnvironmentForProfile(Profile profile)
     {
+        Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY_COMMAND", null);
+
         if (profile.Type == "copilot")
         {
             Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BASE_URL", null);
@@ -958,7 +901,7 @@ class Program
             Environment.SetEnvironmentVariable("COPILOT_PROVIDER_TYPE", null);
             Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", null);
             Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", null);
-            return new AuthEnvironmentResult { UsedAzureCliToken = false };
+            return;
         }
         else if (profile.Type == "byok" || profile.Type == "proxy")
         {
@@ -1007,19 +950,23 @@ class Program
             var useAzureCliToken = ShouldUseAzureCliToken(profile, !string.IsNullOrEmpty(resolvedApiKey));
             if (useAzureCliToken)
             {
-                var token = await GetAzureCliToken(profile);
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", token);
+                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", null);
+                Environment.SetEnvironmentVariable(
+                    "COPILOT_PROVIDER_API_KEY_COMMAND",
+                    BuildAzureCliTokenCommand(profile.TokenScope));
             }
             else if (!string.IsNullOrEmpty(resolvedApiKey))
             {
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", resolvedApiKey);
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", null);
+                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY_COMMAND", null);
             }
             else
             {
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
                 Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", null);
+                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY_COMMAND", null);
             }
 
             if (!string.IsNullOrEmpty(profile.ProviderType))
@@ -1029,28 +976,8 @@ class Program
 
             SetProviderTokenLimitEnvironment(profile);
 
-            return new AuthEnvironmentResult { UsedAzureCliToken = useAzureCliToken };
+            return;
         }
-
-        return new AuthEnvironmentResult { UsedAzureCliToken = false };
-    }
-
-    static bool IsTokenFailure(string output)
-    {
-        if (string.IsNullOrWhiteSpace(output))
-        {
-            return false;
-        }
-
-        var lower = output.ToLowerInvariant();
-        return lower.Contains("401")
-            || lower.Contains("unauthorized")
-            || lower.Contains("forbidden")
-            || lower.Contains("invalid token")
-            || lower.Contains("token expired")
-            || lower.Contains("expired token")
-            || lower.Contains("authentication failed")
-            || lower.Contains("permission denied");
     }
 
     static async Task<ProcessRunResult> RunCopilot(string[] copilotArgs, bool interactiveMode)
@@ -1682,11 +1609,6 @@ class Program
             AnsiConsole.MarkupLine("[dim]Ensure Azure CLI is installed and authenticated: az login[/]");
             return 1;
         }
-    }
-
-    class AuthEnvironmentResult
-    {
-        public bool UsedAzureCliToken { get; set; }
     }
 
     class ProcessRunResult

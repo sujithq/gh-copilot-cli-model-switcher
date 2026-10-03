@@ -376,6 +376,76 @@ public class ConfigManagerTests : IDisposable
     }
 
     [Fact]
+    public void BuildAzureCliTokenCommand_UsesDefaultScopeAndRejectsShellSyntax()
+    {
+        var command = CopilotX.Program.BuildAzureCliTokenCommand(null);
+
+        Assert.Contains("account get-access-token --scope \"https://cognitiveservices.azure.com/.default\"", command);
+        Assert.Contains("--query accessToken -o tsv", command);
+        Assert.Throws<InvalidOperationException>(() =>
+            CopilotX.Program.BuildAzureCliTokenCommand("https://example.com/scope; whoami"));
+    }
+
+    [Fact]
+    public void SetEnvironmentForProfile_UsesCredentialCommandInsteadOfCachedBearerToken()
+    {
+        var variableNames = new[]
+        {
+            "COPILOT_PROVIDER_API_KEY",
+            "COPILOT_PROVIDER_BEARER_TOKEN",
+            "COPILOT_PROVIDER_API_KEY_COMMAND",
+            "COPILOT_PROVIDER_BASE_URL",
+            "COPILOT_MODEL",
+            "COPILOT_PROVIDER_TYPE"
+        };
+        var previousValues = variableNames.ToDictionary(
+            name => name,
+            Environment.GetEnvironmentVariable);
+
+        try
+        {
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", "stale-token");
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY_COMMAND", "stale-command");
+
+            CopilotX.Program.SetEnvironmentForProfile(new Profile
+            {
+                Type = "byok",
+                ProviderType = "azure",
+                BaseUrl = "https://myfoundry.openai.azure.com",
+                Model = "gpt-5-prod",
+                AzureCliToken = "on",
+                TokenScope = "https://cognitiveservices.azure.com/.default"
+            });
+
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_API_KEY"));
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN"));
+            Assert.Contains("account get-access-token", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_API_KEY_COMMAND"));
+
+            CopilotX.Program.SetEnvironmentForProfile(new Profile
+            {
+                Type = "byok",
+                ApiKey = "test-key"
+            });
+
+            Assert.Equal("test-key", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_API_KEY"));
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_API_KEY_COMMAND"));
+
+            CopilotX.Program.SetEnvironmentForProfile(new Profile { Type = "copilot" });
+
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_API_KEY"));
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN"));
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_API_KEY_COMMAND"));
+        }
+        finally
+        {
+            foreach (var (name, value) in previousValues)
+            {
+                Environment.SetEnvironmentVariable(name, value);
+            }
+        }
+    }
+
+    [Fact]
     public void FormatProfileTokenInfo_ReturnsNotSet_WhenNoLimitsConfigured()
     {
         var text = CopilotX.Program.FormatProfileTokenInfo(new Profile());
