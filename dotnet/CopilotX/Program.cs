@@ -69,8 +69,8 @@ class Program
         table.AddRow("[cyan]manage[/]", "Interactive profile management (Use/Remove/Add/Import/MCP)");
         table.AddRow("[cyan]mcp-compat <profile> [[--action set|reset|all|none]][/]", "Set or reset MCP compatibility servers for an Azure BYOK/proxy profile");
         table.AddRow("[cyan]remove [[profiles...]][/]", "Remove one or more profiles (interactive multi-select)");
-        table.AddRow("[cyan]use <profile> [[args...]][/]", "Switch to a specific profile and run gh copilot");
-        table.AddRow("[cyan]last [[args...]][/]", "Use the last used profile and run gh copilot");
+        table.AddRow("[cyan]use <profile> [[args...]][/]", "Switch to a specific profile and run Copilot CLI");
+        table.AddRow("[cyan]last [[args...]][/]", "Use the last used profile and run Copilot CLI");
         table.AddRow("[cyan]default [[args...]][/]", "Use the default Copilot profile");
         table.AddRow("[cyan]add[/]", "Add or update a profile interactively");
         table.AddRow("[cyan]import-foundry [[options]][/]", "Import profiles from Foundry/Azure OpenAI deployments");
@@ -78,7 +78,7 @@ class Program
 
         AnsiConsole.Write(table);
 
-        AnsiConsole.MarkupLine("\n[bold]Passthrough flags[/] [dim](forwarded to gh copilot, applies to use / last / default):[/]");
+        AnsiConsole.MarkupLine("\n[bold]Passthrough flags[/] [dim](forwarded to Copilot CLI, applies to use / last / default):[/]");
         var flagTable = new Table();
         flagTable.AddColumn("Flag");
         flagTable.AddColumn("Description");
@@ -562,8 +562,8 @@ class Program
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error executing gh copilot: {ex.Message}[/]");
-            AnsiConsole.MarkupLine("[dim]Make sure GitHub Copilot CLI is installed: gh extension install github/gh-copilot[/]");
+            AnsiConsole.MarkupLine($"[red]Error executing Copilot CLI: {ex.Message}[/]");
+            AnsiConsole.MarkupLine("[dim]Install the standalone 'copilot' CLI or the legacy extension: gh extension install github/gh-copilot[/]");
             return 1;
         }
     }
