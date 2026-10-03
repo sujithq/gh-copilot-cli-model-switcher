@@ -54,7 +54,7 @@ Full release instructions: [../../RELEASING.md](../../RELEASING.md)
 ## Prerequisites
 
 - .NET 10 SDK or higher
-- GitHub Copilot CLI installed as the standalone `copilot` executable, or as the legacy `gh copilot` extension (`gh extension install github/gh-copilot`).
+- GitHub Copilot CLI installed as the standalone [`copilot` executable](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli), or as the legacy `gh copilot` extension (`gh extension install github/gh-copilot`).
 
 The .NET tool starts `copilot` first and falls back to `gh copilot` only when the standalone executable is not found. Standalone arguments are passed directly; the legacy extension receives them after `gh copilot --`.
 
@@ -596,8 +596,8 @@ Current tests include config scope/path resolution, default config creation, pro
 ### "Profile not found"
 Run `gh-copilot-byok list` to see available profiles or `gh-copilot-byok add` to create a new one.
 
-### "Error executing gh copilot"
-Ensure GitHub Copilot CLI is installed:
+### "Error executing Copilot CLI"
+Install the standalone CLI or the legacy `gh copilot` extension:
 ```bash
 gh extension install github/gh-copilot
 ```

@@ -498,7 +498,7 @@ gh-copilot-byok default
 1. **Config Manager**: Handles loading, saving, and managing profiles
 2. **Profile Switcher**: Sets environment variables based on profile
 3. **CLI Interface**: User-facing commands and interactions
-4. **Copilot Launcher**: Executes `gh copilot` with configured environment
+4. **Copilot Launcher**: The .NET tool starts `copilot` and falls back to `gh copilot`; the Node.js implementation currently starts `gh copilot`
 
 ### Flow
 
@@ -511,7 +511,7 @@ Load Profile Config
     ↓
 Set Environment Variables
     ↓
-Execute gh copilot
+Execute the selected Copilot CLI command
     ↓
 Return Result
 ```
