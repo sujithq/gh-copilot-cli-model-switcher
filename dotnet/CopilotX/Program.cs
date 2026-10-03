@@ -554,8 +554,7 @@ class Program
             {
                 AnsiConsole.MarkupLine("[yellow]Detected token-related auth failure. Refreshing Azure CLI token and retrying once...[/]");
                 var refreshedToken = await GetAzureCliToken(profile);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", refreshedToken);
+                SetProviderAuthEnvironment(null, refreshedToken);
                 result = await RunCopilot(effectiveCopilotArgs, userRequestedInteractive);
             }
 
@@ -856,25 +855,38 @@ class Program
         return token;
     }
 
+    internal static void SetProviderAuthEnvironment(string? apiKey, string? bearerToken)
+    {
+        if (!string.IsNullOrEmpty(bearerToken))
+        {
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", bearerToken);
+        }
+        else if (!string.IsNullOrEmpty(apiKey))
+        {
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", apiKey);
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", null);
+        }
+        else
+        {
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", null);
+        }
+    }
+
     internal static void SetProviderTokenLimitEnvironment(Profile profile)
     {
-        if (profile.MaxOutputTokens.HasValue)
-        {
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", profile.MaxOutputTokens.Value.ToString());
-        }
-        else
-        {
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", null);
-        }
+        SetOptionalProviderEnvironment("COPILOT_PROVIDER_WIRE_API", profile.ProviderWireApi);
+        SetOptionalProviderEnvironment("COPILOT_PROVIDER_AZURE_API_VERSION", profile.ProviderAzureApiVersion);
+        SetOptionalProviderEnvironment("COPILOT_PROVIDER_MODEL_ID", profile.ProviderModelId);
+        SetOptionalProviderEnvironment("COPILOT_PROVIDER_WIRE_MODEL", profile.ProviderWireModel);
+        SetOptionalProviderEnvironment("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", profile.MaxOutputTokens?.ToString());
+        SetOptionalProviderEnvironment("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", profile.MaxPromptTokens?.ToString());
+    }
 
-        if (profile.MaxPromptTokens.HasValue)
-        {
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", profile.MaxPromptTokens.Value.ToString());
-        }
-        else
-        {
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", null);
-        }
+    private static void SetOptionalProviderEnvironment(string name, string? value)
+    {
+        Environment.SetEnvironmentVariable(name, string.IsNullOrWhiteSpace(value) ? null : value);
     }
 
     static int? AskOptionalInt(string prompt)
@@ -952,12 +964,10 @@ class Program
         if (profile.Type == "copilot")
         {
             Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BASE_URL", null);
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", null);
+            SetProviderAuthEnvironment(null, null);
             Environment.SetEnvironmentVariable("COPILOT_MODEL", null);
             Environment.SetEnvironmentVariable("COPILOT_PROVIDER_TYPE", null);
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", null);
-            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", null);
+            SetProviderTokenLimitEnvironment(profile);
             return new AuthEnvironmentResult { UsedAzureCliToken = false };
         }
         else if (profile.Type == "byok" || profile.Type == "proxy")
@@ -1008,18 +1018,11 @@ class Program
             if (useAzureCliToken)
             {
                 var token = await GetAzureCliToken(profile);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", token);
-            }
-            else if (!string.IsNullOrEmpty(resolvedApiKey))
-            {
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", resolvedApiKey);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", null);
+                SetProviderAuthEnvironment(null, token);
             }
             else
             {
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", null);
-                Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", null);
+                SetProviderAuthEnvironment(resolvedApiKey, null);
             }
 
             if (!string.IsNullOrEmpty(profile.ProviderType))
@@ -1057,34 +1060,14 @@ class Program
     {
         if (interactiveMode)
         {
-            AnsiConsole.MarkupLine("[dim]Launching gh copilot in interactive mode. Type your question below:[/]");
+            AnsiConsole.MarkupLine("[dim]Launching Copilot CLI in interactive mode. Type your question below:[/]");
             AnsiConsole.MarkupLine("[dim]If prompted to trust this folder, choose option 2 once to remember it.[/]");
             AnsiConsole.MarkupLine("");
 
-            // Interactive gh copilot expects a real terminal (TTY). Avoid redirected pipes here.
-            var interactiveStartInfo = new ProcessStartInfo
-            {
-                FileName = "gh",
-                UseShellExecute = false,
-                RedirectStandardInput = false,
-                RedirectStandardOutput = false,
-                RedirectStandardError = false
-            };
-
-            interactiveStartInfo.ArgumentList.Add("copilot");
-            if (copilotArgs.Length > 0)
-            {
-                interactiveStartInfo.ArgumentList.Add("--");
-                foreach (var arg in copilotArgs)
-                {
-                    interactiveStartInfo.ArgumentList.Add(arg);
-                }
-            }
-
-            var interactiveProcess = Process.Start(interactiveStartInfo);
+            var interactiveProcess = StartCopilotProcess(copilotArgs, interactiveMode: true);
             if (interactiveProcess == null)
             {
-                throw new InvalidOperationException("Failed to start gh copilot.");
+                throw new InvalidOperationException("Failed to start Copilot CLI.");
             }
 
             await interactiveProcess.WaitForExitAsync();
@@ -1096,29 +1079,10 @@ class Program
             };
         }
 
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "gh",
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-
-        startInfo.ArgumentList.Add("copilot");
-        if (copilotArgs.Length > 0)
-        {
-            startInfo.ArgumentList.Add("--");
-            foreach (var arg in copilotArgs)
-            {
-                startInfo.ArgumentList.Add(arg);
-            }
-        }
-
-        var process = Process.Start(startInfo);
+        var process = StartCopilotProcess(copilotArgs, interactiveMode: false);
         if (process == null)
         {
-            throw new InvalidOperationException("Failed to start gh copilot.");
+            throw new InvalidOperationException("Failed to start Copilot CLI.");
         }
 
         _ = Task.Run(async () =>
@@ -1168,6 +1132,55 @@ class Program
         };
     }
 
+    internal static (string FileName, string[] Arguments)[] BuildCopilotCommands(string[] copilotArgs)
+    {
+        var standaloneCommand = ("copilot", copilotArgs);
+        string[] ghArguments = copilotArgs.Length > 0
+            ? ["copilot", "--", .. copilotArgs]
+            : ["copilot"];
+
+        return [standaloneCommand, ("gh", ghArguments)];
+    }
+
+    private static Process? StartCopilotProcess(string[] copilotArgs, bool interactiveMode)
+    {
+        var commands = BuildCopilotCommands(copilotArgs);
+        for (var i = 0; i < commands.Length; i++)
+        {
+            var (fileName, arguments) = commands[i];
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = fileName,
+                UseShellExecute = false,
+                RedirectStandardInput = !interactiveMode,
+                RedirectStandardOutput = !interactiveMode,
+                RedirectStandardError = !interactiveMode
+            };
+
+            foreach (var arg in arguments)
+            {
+                startInfo.ArgumentList.Add(arg);
+            }
+
+            try
+            {
+                return Process.Start(startInfo);
+            }
+            catch (Exception ex) when (i == 0 && fileName == "copilot" && IsExecutableNotFound(ex))
+            {
+                AnsiConsole.MarkupLine("[dim]Standalone 'copilot' was not found; falling back to 'gh copilot'.[/]");
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsExecutableNotFound(Exception exception)
+    {
+        return exception is FileNotFoundException
+            || exception is System.ComponentModel.Win32Exception { NativeErrorCode: 2 or 3 };
+    }
+
     static int AddCommand()
     {
         AnsiConsole.MarkupLine("[bold blue]Add/Update Profile[/]\n");
@@ -1212,6 +1225,10 @@ class Program
             }
 
             profile.ProviderType = AnsiConsole.Ask<string>("Provider [cyan]type[/] (optional):", string.Empty);
+            profile.ProviderWireApi = AnsiConsole.Ask<string>("Provider [cyan]wire API[/] (optional):", string.Empty);
+            profile.ProviderAzureApiVersion = AnsiConsole.Ask<string>("Azure [cyan]API version[/] (optional):", string.Empty);
+            profile.ProviderModelId = AnsiConsole.Ask<string>("Provider [cyan]model ID[/] (optional):", string.Empty);
+            profile.ProviderWireModel = AnsiConsole.Ask<string>("Provider [cyan]wire model/deployment[/] (optional):", string.Empty);
 
             profile.AzureCliToken = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()

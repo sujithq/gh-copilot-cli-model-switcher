@@ -298,6 +298,50 @@ public class ConfigManagerTests : IDisposable
     }
 
     [Fact]
+    public void AddProfile_PersistsProviderWireSettings()
+    {
+        var profile = new Profile
+        {
+            Name = "azure-wire",
+            Type = "byok",
+            ProviderWireApi = "completions",
+            ProviderAzureApiVersion = "2025-01-01",
+            ProviderModelId = "gpt-4.1",
+            ProviderWireModel = "deployment-4-1"
+        };
+
+        Assert.True(ConfigManager.AddProfile(profile));
+
+        var saved = ConfigManager.GetProfile("azure-wire");
+
+        Assert.NotNull(saved);
+        Assert.Equal("completions", saved!.ProviderWireApi);
+        Assert.Equal("2025-01-01", saved.ProviderAzureApiVersion);
+        Assert.Equal("gpt-4.1", saved.ProviderModelId);
+        Assert.Equal("deployment-4-1", saved.ProviderWireModel);
+    }
+
+    [Fact]
+    public void AddProfile_DoesNotMergeProfilesWithDifferentProviderWireSettings()
+    {
+        Assert.True(ConfigManager.AddProfile(new Profile
+        {
+            Name = "wire-api-a",
+            Type = "byok",
+            ProviderWireApi = "completions"
+        }));
+        Assert.True(ConfigManager.AddProfile(new Profile
+        {
+            Name = "wire-api-b",
+            Type = "byok",
+            ProviderWireApi = "responses"
+        }));
+
+        Assert.NotNull(ConfigManager.GetProfile("wire-api-a"));
+        Assert.NotNull(ConfigManager.GetProfile("wire-api-b"));
+    }
+
+    [Fact]
     public void LoadConfig_ReadsLegacyMaxTokensAliasIntoMaxOutputTokens()
     {
         ConfigManager.EnsureConfigDir();
@@ -351,20 +395,36 @@ public class ConfigManagerTests : IDisposable
     {
         var previousMaxOutput = Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS");
         var previousMaxPrompt = Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS");
+        var previousWireApi = Environment.GetEnvironmentVariable("COPILOT_PROVIDER_WIRE_API");
+        var previousAzureApiVersion = Environment.GetEnvironmentVariable("COPILOT_PROVIDER_AZURE_API_VERSION");
+        var previousModelId = Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MODEL_ID");
+        var previousWireModel = Environment.GetEnvironmentVariable("COPILOT_PROVIDER_WIRE_MODEL");
 
         try
         {
             CopilotX.Program.SetProviderTokenLimitEnvironment(new Profile
             {
+                ProviderWireApi = "completions",
+                ProviderAzureApiVersion = "2025-01-01",
+                ProviderModelId = "gpt-4.1",
+                ProviderWireModel = "deployment-4-1",
                 MaxOutputTokens = 8192,
                 MaxPromptTokens = 64000
             });
 
+            Assert.Equal("completions", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_WIRE_API"));
+            Assert.Equal("2025-01-01", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_AZURE_API_VERSION"));
+            Assert.Equal("gpt-4.1", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MODEL_ID"));
+            Assert.Equal("deployment-4-1", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_WIRE_MODEL"));
             Assert.Equal("8192", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS"));
             Assert.Equal("64000", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS"));
 
             CopilotX.Program.SetProviderTokenLimitEnvironment(new Profile());
 
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_WIRE_API"));
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_AZURE_API_VERSION"));
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MODEL_ID"));
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_WIRE_MODEL"));
             Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS"));
             Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS"));
         }
@@ -372,7 +432,45 @@ public class ConfigManagerTests : IDisposable
         {
             Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_OUTPUT_TOKENS", previousMaxOutput);
             Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MAX_PROMPT_TOKENS", previousMaxPrompt);
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_WIRE_API", previousWireApi);
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_AZURE_API_VERSION", previousAzureApiVersion);
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_MODEL_ID", previousModelId);
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_WIRE_MODEL", previousWireModel);
         }
+    }
+
+    [Fact]
+    public void SetProviderAuthEnvironment_SetsOnlySelectedAuthVariable()
+    {
+        var previousApiKey = Environment.GetEnvironmentVariable("COPILOT_PROVIDER_API_KEY");
+        var previousBearerToken = Environment.GetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN");
+
+        try
+        {
+            CopilotX.Program.SetProviderAuthEnvironment("api-key", null);
+            Assert.Equal("api-key", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_API_KEY"));
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN"));
+
+            CopilotX.Program.SetProviderAuthEnvironment(null, "bearer-token");
+            Assert.Null(Environment.GetEnvironmentVariable("COPILOT_PROVIDER_API_KEY"));
+            Assert.Equal("bearer-token", Environment.GetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_API_KEY", previousApiKey);
+            Environment.SetEnvironmentVariable("COPILOT_PROVIDER_BEARER_TOKEN", previousBearerToken);
+        }
+    }
+
+    [Fact]
+    public void BuildCopilotCommands_PrefersStandaloneAndRetainsGhFallback()
+    {
+        var commands = CopilotX.Program.BuildCopilotCommands(new[] { "-p", "hello" });
+
+        Assert.Equal("copilot", commands[0].FileName);
+        Assert.Equal(new[] { "-p", "hello" }, commands[0].Arguments);
+        Assert.Equal("gh", commands[1].FileName);
+        Assert.Equal(new[] { "copilot", "--", "-p", "hello" }, commands[1].Arguments);
     }
 
     [Fact]
