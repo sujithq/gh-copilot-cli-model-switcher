@@ -392,13 +392,15 @@ gh copilot
 
 `maxOutputTokens` is useful when you want to cap generated output as Copilot CLI usage shifts from request-based to token-based accounting. If you also need to constrain how much context is sent to the provider, set `maxPromptTokens`.
 
-If `azureCliToken` is enabled (or `auto` detects Azure profile with no API key), gh-copilot-byok runs:
+If `azureCliToken` is enabled (or `auto` detects an Azure profile with no API key), gh-copilot-byok sets `COPILOT_PROVIDER_API_KEY_COMMAND` to retrieve a fresh token for every provider request:
 
 ```bash
-az account get-access-token --scope https://cognitiveservices.azure.com/.default --query accessToken -o tsv
+az account get-access-token --scope "https://cognitiveservices.azure.com/.default" --query accessToken -o tsv
 ```
 
-The returned token is set as `COPILOT_PROVIDER_BEARER_TOKEN`. `COPILOT_PROVIDER_API_KEY` is cleared in token mode to avoid auth-mode ambiguity.
+The token is no longer read into the switcher's process or saved in an environment variable, so Copilot CLI can obtain a fresh credential instead of reusing an expiring bearer token. The scope must be an HTTPS URL without shell-special characters.
+
+Copilot CLI's native `~/.copilot/providers.json` registry takes precedence over legacy `COPILOT_PROVIDER_*` variables when it declares providers or models. The profile launch flow described above uses the legacy variables; see the [Copilot CLI configuration directory reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-config-dir-reference) and [BYOK documentation](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-byok-models) for native provider setup.
 
 For Azure BYOK profiles, gh-copilot-byok also enables an MCP compatibility mode by default to avoid provider tool-count limits (for example: `Invalid 'tools': array too long`).
 
@@ -434,8 +436,7 @@ gh-copilot-byok use myprofile -p "fix the tests" --allow-tool=write
 gh-copilot-byok use myprofile -p "fix the tests" --deny-tool=run_command
 ```
 
-Retry behavior:
-- If `gh copilot` fails with token/auth-related errors, gh-copilot-byok refreshes the token and retries once.
+Azure token freshness is handled by Copilot CLI invoking the credential command before each provider request.
 
 ## Enterprise Scenarios
 
